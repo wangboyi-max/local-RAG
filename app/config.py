@@ -1,0 +1,46 @@
+from pydantic_settings import BaseSettings
+
+
+class Settings(BaseSettings):
+    # 嵌入模型
+    embedding_model: str = "BAAI/bge-m3"
+    embedding_device: str = "cpu"
+
+    # ChromaDB
+    chroma_db_path: str = "./data/chroma_db"
+    chroma_collection_name: str = "documents"
+
+    # 文本切分
+    chunk_size: int = 500
+    chunk_overlap: int = 100
+
+    # 检索
+    top_k: int = 4
+
+    # OCR
+    ocr_languages: str = "ch,en"
+    ocr_dpi: int = 200
+
+    # 文件存储
+    upload_dir: str = "./data/uploads"
+    notes_dir: str = "./data/notes"
+
+    # Neo4j 知识图谱
+    neo4j_uri: str = "bolt://localhost:7687"
+    neo4j_user: str = "neo4j"
+    neo4j_password: str = "ragpassword123"
+
+    # 图谱实体提取
+    graph_entity_extractor: str = "jieba"  # jieba 或 llm
+    graph_max_entities: int = 10
+    graph_max_depth: int = 2
+
+    # LLM 实体提取
+    llm_api_key: str = ""
+    llm_api_base: str = "https://api.minimaxi.com/v1"
+    llm_model: str = "MiniMax-M2.7"
+
+    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+
+
+settings = Settings()
