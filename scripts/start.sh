@@ -19,7 +19,17 @@ fi
 
 # 设置默认数据目录
 if [ -z "$LOCAL_RAG_DATA_DIR" ]; then
-    export LOCAL_RAG_DATA_DIR="${HOME}/.local/share/local-rag"
+    # 优先读 .env 里的配置
+    if [ -f "${PLUGIN_ROOT}/.env" ]; then
+        _env_val=$(grep '^LOCAL_RAG_DATA_DIR=' "${PLUGIN_ROOT}/.env" 2>/dev/null | head -1 | cut -d= -f2-)
+        if [ -n "$_env_val" ]; then
+            export LOCAL_RAG_DATA_DIR="$_env_val"
+        fi
+    fi
+    # .env 没有则用默认路径
+    if [ -z "$LOCAL_RAG_DATA_DIR" ]; then
+        export LOCAL_RAG_DATA_DIR="${HOME}/.local/share/local-rag"
+    fi
 fi
 
 # 确保数据目录存在

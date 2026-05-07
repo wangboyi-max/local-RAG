@@ -49,11 +49,36 @@ if [ ! -f ".env" ]; then
 fi
 echo "✓ 配置文件就绪"
 
-# 创建外部数据目录
-DATA_DIR="${LOCAL_RAG_DATA_DIR:-${HOME}/.local/share/local-rag}"
+# 选择数据目录
+DEFAULT_DATA_DIR="${HOME}/.local/share/local-rag"
+echo ""
+echo "请选择数据目录路径："
+echo "  1) $DEFAULT_DATA_DIR (推荐)"
+echo "  2) 自定义路径"
+read -p "选择 [1/2]: " dir_choice
+
+if [ "$dir_choice" = "2" ]; then
+    read -p "输入数据目录路径: " DATA_DIR
+    # 展开 ~ 符号
+    DATA_DIR="${DATA_DIR/#\~/$HOME}"
+    if [ -z "$DATA_DIR" ]; then
+        echo "路径为空，使用默认路径: $DEFAULT_DATA_DIR"
+        DATA_DIR="$DEFAULT_DATA_DIR"
+    fi
+else
+    DATA_DIR="$DEFAULT_DATA_DIR"
+fi
 echo "→ 数据目录: $DATA_DIR"
 mkdir -p "$DATA_DIR/chroma_db" "$DATA_DIR/uploads" "$DATA_DIR/notes"
 echo "✓ 数据目录已创建"
+
+# 写入 .env
+if grep -q "^LOCAL_RAG_DATA_DIR" .env 2>/dev/null; then
+    sed -i "s|^LOCAL_RAG_DATA_DIR=.*|LOCAL_RAG_DATA_DIR=$DATA_DIR|" .env
+else
+    echo "LOCAL_RAG_DATA_DIR=$DATA_DIR" >> .env
+fi
+echo "✓ .env 已写入 LOCAL_RAG_DATA_DIR=$DATA_DIR"
 
 # 启动 Neo4j
 if ! docker ps -a --format '{{.Names}}' | grep -q '^neo4j-rag$'; then
