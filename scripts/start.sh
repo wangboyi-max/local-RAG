@@ -15,18 +15,23 @@ if ! command -v python3 &>/dev/null; then
 fi
 
 # ── 2. 确保 venv + 依赖 ─────────────────────────────────
-if [ -d ".venv" ]; then
+if [ ! -d ".venv" ]; then
+    echo "[local-rag] 首次启动：创建虚拟环境..."
+    if command -v uv &>/dev/null; then
+        uv venv
+    fi
     PYTHON=".venv/bin/python"
 else
+    PYTHON=".venv/bin/python"
+fi
+
+# 检查关键依赖是否已安装（每次启动自动同步）
+if ! "$PYTHON" -c "import pydantic, httpx, mcp" 2>/dev/null; then
+    echo "[local-rag] 安装/更新依赖..."
     if command -v uv &>/dev/null; then
-        echo "[local-rag] 首次启动：创建虚拟环境..."
-        uv venv
-        echo "[local-rag] 首次启动：安装依赖（可能需要几分钟）..."
         uv pip install -e .
-        PYTHON=".venv/bin/python"
     else
-        echo "[local-rag] 警告：未找到 uv，使用系统 Python"
-        PYTHON="python3"
+        "$PYTHON" -m pip install -e .
     fi
 fi
 
