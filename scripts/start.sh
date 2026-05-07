@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# 启动 local-rag MCP Server
-# 首次启动自动完成所有初始化：venv、依赖、.env、Neo4j、数据目录
+# 启动 local-rag MCP Server（Daemon + Proxy 架构）
+# 首次启动自动完成所有初始化：venv、依赖、.env、Neo4j、数据目录、daemon
 
 set -e
 
@@ -68,5 +68,24 @@ if command -v docker &>/dev/null; then
     fi
 fi
 
-# ── 6. 启动 MCP Server ──────────────────────────────────
-exec "$PYTHON" -m app.main
+# ── 6. 启动 Daemon（如未运行）────────────────────────────
+DAEMON_PORT="${LOCAL_RAG_DAEMON_PORT:-27890}"
+
+if curl -s --max-time 1 "http://localhost:${DAEMON_PORT}/health" > /dev/null 2>&1; then
+    echo "[local-rag] Daemon 已在运行 (port ${DAEMON_PORT})"
+else
+    echo "[local-rag] 启动 daemon..."
+    "$PYTHON" -m app.daemon >> "$LOCAL_RAG_DATA_DIR/daemon.log" 2>&1 &
+
+    # 等待 daemon 就绪（最长 30 秒）
+    for i in $(seq 1 60); do
+        if curl -s --max-time 1 "http://localhost:${DAEMON_PORT}/health" > /dev/null 2>&1; then
+            echo "[local-rag] Daemon 就绪"
+            break
+        fi
+        sleep 0.5
+    done
+fi
+
+# ── 7. 启动 stdio Proxy（替换当前 shell 进程）────────────
+exec "$PYTHON" -m app.proxy

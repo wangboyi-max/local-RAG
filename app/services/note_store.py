@@ -36,10 +36,12 @@ class NoteStoreService:
         vector_store: VectorStoreService,
         graph_store: GraphStoreService | None = None,
         task_tracker: TaskTrackerService | None = None,
+        write_lock: object | None = None,
     ):
         self.vector_store = vector_store
         self.graph_store = graph_store
         self.task_tracker = task_tracker
+        self.write_lock = write_lock
         self.notes_dir = Path(settings.notes_dir)
         self.notes_dir.mkdir(parents=True, exist_ok=True)
         self.index_file = self.notes_dir / "index.json"
@@ -258,12 +260,17 @@ class NoteStoreService:
         total = len(chunks)
         if task_id:
             self.task_tracker.update_task(task_id, progress=f"向量化 {total} 个文本块")
-        self.vector_store.add_documents(chunks, metadatas, ids)
 
-        if self.graph_store and chunks:
-            if task_id:
-                self.task_tracker.update_task(task_id, progress=f"实体提取 1/{total}")
-            self.graph_store.add_entities(chunks, metadatas)
+        def _write():
+            self.vector_store.add_documents(chunks, metadatas, ids)
+            if self.graph_store and chunks:
+                self.graph_store.add_entities(chunks, metadatas)
+
+        if self.write_lock:
+            with self.write_lock:
+                _write()
+        else:
+            _write()
 
         if task_id:
             self.task_tracker.update_task(

@@ -53,6 +53,9 @@ class Settings(BaseSettings):
     graph_max_entities: int = 10
     graph_max_depth: int = 2
 
+    # Daemon 端口（内部 HTTP 服务）
+    daemon_port: int = 27890
+
     # LLM 实体提取
     llm_api_key: str = ""
     llm_api_base: str = "https://api.minimaxi.com/v1"
