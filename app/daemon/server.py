@@ -5,6 +5,7 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from app.config import settings
+from app.services.task_tracker import TaskStatus
 
 logger = logging.getLogger(__name__)
 
@@ -130,13 +131,17 @@ class _RequestHandler(BaseHTTPRequestHandler):
         import os
         if not os.path.isfile(file_path):
             return f"错误：文件不存在 - {file_path}"
+        task_id = self.task_tracker.create_task("ingest", f"索引文件：{os.path.basename(file_path)}")
+        self.task_tracker.run_background(task_id, lambda tid: self._ingest_background(file_path, tid))
+        return f"文件索引任务已提交，正在后台处理。\n任务 ID: `{task_id}`\n请用 `task_status` 查询进度。"
+
+    def _ingest_background(self, file_path: str, task_id: str):
         with _write_lock:
             result = self.ingestion.ingest(file_path)
         action_text = "重新索引（覆盖）" if result["action"] == "replaced" else "索引"
-        return (
-            f"成功{action_text}文件 `{result['source']}`\n"
-            f"- 页数: {result['pages']}\n"
-            f"- 文本块: {result['chunks']}"
+        self.task_tracker.update_task(
+            task_id, status=TaskStatus.COMPLETED,
+            result=f"成功{action_text}文件 `{result['source']}`\n- 页数: {result['pages']}\n- 文本块: {result['chunks']}",
         )
 
     def _handle_delete_docs(self, source: str) -> str:
