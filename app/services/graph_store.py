@@ -147,18 +147,29 @@ class GraphStoreService:
             return [dict(record) for record in result]
 
     def delete_by_source(self, source: str) -> int:
-        """删除指定来源的所有 Chunk 节点及相关孤立 Entity。"""
+        """删除指定来源的所有 Chunk 节点及孤立 Entity。"""
         with self.driver.session() as session:
-            result = session.run(
+            session.run(
                 """
                 MATCH (c:Chunk {source: $source})
                 OPTIONAL MATCH (c)-[r:MENTIONS]-(e:Entity)
+                WITH c, r, e
                 DELETE c, r
-                RETURN count(c) AS deleted
                 """,
                 source=source,
             )
-            record = result.single()
+            # 清理孤立 Entity（无任何 Chunk 引用的实体）
+            orphan_result = session.run(
+                """
+                MATCH (e:Entity)
+                WHERE NOT (e)<-[:MENTIONS]-()
+                WITH e
+                OPTIONAL MATCH (e)-[r:RELATED_TO]-()
+                DELETE e, r
+                RETURN count(e) AS deleted
+                """,
+            )
+            record = orphan_result.single()
             return record["deleted"] if record else 0
 
     def delete_by_note_id(self, note_id: str) -> int:
