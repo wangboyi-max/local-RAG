@@ -76,15 +76,20 @@ fi
 # ── 6. 启动 Daemon（如未运行）────────────────────────────
 DAEMON_PORT="${LOCAL_RAG_DAEMON_PORT:-27890}"
 
-if curl -s --max-time 1 "http://localhost:${DAEMON_PORT}/health" > /dev/null 2>&1; then
+_health_check() {
+    response=$(curl -s --max-time 3 "http://localhost:${DAEMON_PORT}/health" 2>/dev/null)
+    echo "$response" | grep -q '"ok"'
+}
+
+if _health_check; then
     echo "[local-rag] Daemon 已在运行 (port ${DAEMON_PORT})" >&2
 else
     echo "[local-rag] 启动 daemon..." >&2
     "$PYTHON" -m app.daemon >> "$LOCAL_RAG_DATA_DIR/daemon.log" 2>&1 &
 
-    # 等待 daemon 就绪（最长 30 秒）
-    for i in $(seq 1 60); do
-        if curl -s --max-time 1 "http://localhost:${DAEMON_PORT}/health" > /dev/null 2>&1; then
+    # 等待 daemon 就绪（最长 60 秒）
+    for i in $(seq 1 120); do
+        if _health_check; then
             echo "[local-rag] Daemon 就绪" >&2
             break
         fi
