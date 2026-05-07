@@ -1,4 +1,18 @@
+import os
+from pathlib import Path
+
 from pydantic_settings import BaseSettings
+
+# 外部数据目录：插件升级时不破坏数据
+# 优先级: LOCAL_RAG_DATA_DIR 环境变量 > ~/.local/share/local-rag > ./data
+_data_dir = os.environ.get("LOCAL_RAG_DATA_DIR")
+if not _data_dir:
+    _home = Path.home()
+    _legacy = _home / ".local" / "share" / "local-rag"
+    if _legacy.exists():
+        _data_dir = str(_legacy)
+    else:
+        _data_dir = "./data"
 
 
 class Settings(BaseSettings):
@@ -7,7 +21,7 @@ class Settings(BaseSettings):
     embedding_device: str = "cpu"
 
     # ChromaDB
-    chroma_db_path: str = "./data/chroma_db"
+    chroma_db_path: str = str(Path(_data_dir) / "chroma_db")
     chroma_collection_name: str = "documents"
 
     # 文本切分
@@ -23,8 +37,8 @@ class Settings(BaseSettings):
     ocr_dpi: int = 200
 
     # 文件存储
-    upload_dir: str = "./data/uploads"
-    notes_dir: str = "./data/notes"
+    upload_dir: str = str(Path(_data_dir) / "uploads")
+    notes_dir: str = str(Path(_data_dir) / "notes")
 
     # Neo4j 知识图谱
     neo4j_uri: str = "bolt://localhost:7687"

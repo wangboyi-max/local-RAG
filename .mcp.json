@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "local-rag": {
+      "command": "${CLAUDE_PLUGIN_ROOT}/scripts/start.sh",
+      "env": {
+        "LOCAL_RAG_DATA_DIR": "${HOME}/.local/share/local-rag"
+      }
+    }
+  }
+}
