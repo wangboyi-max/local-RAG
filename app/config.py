@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 
+from pydantic import Field
 from pydantic_settings import BaseSettings
 
 # 外部数据目录：插件升级时不破坏数据
@@ -15,8 +16,8 @@ Path(_data_dir).mkdir(parents=True, exist_ok=True)
 
 
 class Settings(BaseSettings):
-    # 数据目录根路径
-    data_dir: str = _data_dir
+    # 数据目录根路径（通过 LOCAL_RAG_DATA_DIR 环境变量或 .env 设置）
+    data_dir: str = Field(default=_data_dir, alias="LOCAL_RAG_DATA_DIR")
 
     # 嵌入模型
     embedding_model: str = "BAAI/bge-m3"
@@ -57,7 +58,7 @@ class Settings(BaseSettings):
     llm_api_base: str = "https://api.minimaxi.com/v1"
     llm_model: str = "MiniMax-M2.7"
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "populate_by_name": True}
 
 
 settings = Settings()
