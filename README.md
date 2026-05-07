@@ -33,39 +33,30 @@
 - [uv](https://docs.astral.sh/uv/) 包管理器
 - Docker（用于运行 Neo4j）
 
-### 方式一：插件安装（推荐）
+### 插件安装（推荐）
 
-```bash
-# 克隆到插件目录
-mkdir -p ~/.claude/plugins
-git clone <repo-url> ~/.claude/plugins/local-rag
+在 Claude Code 中运行：
 
-# 首次安装（检查依赖、创建 venv、启动 Neo4j、运行迁移）
-bash ~/.claude/plugins/local-rag/scripts/install.sh
-
-# 配置 .env
-cp ~/.claude/plugins/local-rag/.env.example ~/.claude/plugins/local-rag/.env
-# 编辑 .env 设置 LLM_API_KEY
+```
+/plugin marketplace add wangboyi-max/local-RAG
+/plugin install local-rag@local-rag-mcp
 ```
 
-安装后重启 Claude Code，插件会自动注册 MCP server。
+首次调用 MCP 工具时会自动完成所有初始化：创建虚拟环境、安装依赖、初始化数据目录、启动 Neo4j 容器。只需确保编辑 `.env` 设置 `LLM_API_KEY` 即可开始使用。
 
-### 方式二：开发模式
+### 开发模式
 
 ```bash
 cd /path/to/local_rag
-
-# 安装
-bash scripts/install.sh
-
-# 直接启动
-bash scripts/start.sh
+bash scripts/install.sh   # 检查前置依赖
+bash scripts/start.sh     # 启动 MCP Server
 ```
 
 ### 升级
 
+在 Claude Code 中运行 `/plugin update local-rag`，或在开发目录：
+
 ```bash
-cd ~/.claude/plugins/local-rag  # 或开发目录
 git pull
 bash scripts/upgrade.sh
 ```
@@ -85,11 +76,11 @@ bash scripts/upgrade.sh
 └── .installed_version  # 当前安装的版本号
 ```
 
-可通过 `LOCAL_RAG_DATA_DIR` 环境变量自定义路径。
+可通过 `LOCAL_RAG_DATA_DIR` 环境变量或 `.env` 自定义路径。
 
 ## 下载嵌入模型
 
-BGE-M3 模型约 2.3GB，首次启动时会自动下载。国内用户推荐从 ModelScope 下载：
+BGE-M3 模型约 2.3GB，首次启动时会自动下载。国内用户推荐从 ModelScope 手动下载：
 
 ```bash
 uv pip install modelscope
@@ -163,15 +154,7 @@ MATCH (n) OPTIONAL MATCH (n)-[r]->(m) RETURN n, r, m LIMIT 100
 
 ## GPU 加速
 
-```bash
-# 卸载 CPU 版本，安装 GPU 版本（CUDA 13.0）
-uv pip uninstall paddlepaddle
-uv pip install --no-deps "paddlepaddle-gpu>=3.3.0" \
-  --index-strategy unsafe-best-match \
-  --extra-index-url https://www.paddlepaddle.org.cn/packages/stable/cu130/
-```
-
-设置 `EMBEDDING_DEVICE=gpu` 启用 BGE-M3 GPU 推理。
+PaddleOCR 默认安装 GPU 版本（CUDA 13.0）。设置 `EMBEDDING_DEVICE=gpu` 启用 BGE-M3 GPU 推理。
 
 ## 开发
 
