@@ -10,7 +10,8 @@ def main():
     logging.basicConfig(level=logging.INFO, format="%(message)s")
 
     # 确定数据目录
-    data_dir = __import__("app").config.settings.data_dir
+    from app.config import settings
+    data_dir = settings.data_dir
 
     # 运行迁移
     try:

@@ -54,7 +54,13 @@ class DaemonServer:
         logger.info("[daemon] 服务单例初始化完成")
 
     def start(self):
-        self.server = ThreadingHTTPServer(("", self.port), self._handler)
+        # 注入服务实例到 handler class 属性
+        _RequestHandler.note_store = self.note_store
+        _RequestHandler.task_tracker = self.task_tracker
+        _RequestHandler.ingestion = self.ingestion
+        _RequestHandler.retrieval = self.retrieval
+        _RequestHandler.graph_store = self.graph_store
+        self.server = ThreadingHTTPServer(("", self.port), _RequestHandler)
         logger.info("[daemon] 启动于 http://localhost:%d", self.port)
         self.server.serve_forever()
 
@@ -63,28 +69,16 @@ class DaemonServer:
             self.server.shutdown()
             logger.info("[daemon] 已关闭")
 
-    def _handler(self, *args, **kwargs):
-        """创建请求处理器，注入服务实例。"""
-        handler = _RequestHandler(
-            self.note_store,
-            self.task_tracker,
-            self.ingestion,
-            self.retrieval,
-            *args,
-            **kwargs,
-        )
-        handler.handle()
-
 
 class _RequestHandler(BaseHTTPRequestHandler):
-    """HTTP 请求处理器。"""
+    """HTTP 请求处理器，通过类属性注入服务实例。"""
 
-    def __init__(self, note_store, task_tracker, ingestion, retrieval, *args, **kwargs):
-        self.note_store = note_store
-        self.task_tracker = task_tracker
-        self.ingestion = ingestion
-        self.retrieval = retrieval
-        super().__init__(*args, **kwargs)
+    # 由 DaemonServer.start() 注入
+    note_store = None
+    task_tracker = None
+    ingestion = None
+    retrieval = None
+    graph_store = None
 
     # ── HTTP 方法 ─────────────────────────────────────────
 
