@@ -1,7 +1,6 @@
 import os
-import sys
+import shutil
 import uuid
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 
 from app.services.chunking import get_paragraph_aware_text_splitter
@@ -32,6 +31,13 @@ class IngestionPipeline:
 
         source = os.path.basename(file_path)
 
+        # 复制到 uploads 目录，后续处理都基于副本
+        upload_dir = settings.upload_dir
+        local_path = os.path.join(upload_dir, source)
+        os.makedirs(upload_dir, exist_ok=True)
+        if file_path != local_path:
+            shutil.copy2(file_path, local_path)
+
         # 覆盖模式：如果已存在同名文档，先删除
         action = "indexed"
         existing = self.vector_store.get_unique_sources()
@@ -42,9 +48,9 @@ class IngestionPipeline:
             action = "replaced"
 
         if ext == ".pdf":
-            return self._ingest_pdf(file_path, source, action, progress_callback)
+            return self._ingest_pdf(local_path, source, action, progress_callback)
         else:
-            return self._ingest_image(file_path, source, action)
+            return self._ingest_image(local_path, source, action)
 
     def _report(self, progress_callback, message):
         if progress_callback:
@@ -117,16 +123,16 @@ class IngestionPipeline:
         if not chunks:
             return {"source": source, "pages": 1, "chunks": 0, "action": action}
 
-        ids = [f"{source}-{uuid.uuid4().hex[:8]}-{i}" for i in range(len(texts))]
+        ids = [f"{source}-{uuid.uuid4().hex[:8]}-{i}" for i in range(len(chunks))]
         now = datetime.now(timezone.utc).isoformat()
         metadatas = [
             {"source": source, "page": 1, "chunk_index": i, "chunk_id": ids[i], "ingested_at": now}
-            for i in range(len(texts))
+            for i in range(len(chunks))
         ]
-        self.vector_store.add_documents(texts, metadatas, ids)
+        self.vector_store.add_documents(chunks, metadatas, ids)
 
         # 写入图谱
         if self.graph_store:
-            self.graph_store.add_entities(texts, metadatas)
+            self.graph_store.add_entities(chunks, metadatas)
 
-        return {"source": source, "pages": 1, "chunks": len(texts), "action": action}
+        return {"source": source, "pages": 1, "chunks": len(chunks), "action": action}
