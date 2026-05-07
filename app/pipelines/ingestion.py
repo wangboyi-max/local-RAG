@@ -94,7 +94,7 @@ class IngestionPipeline:
             if self.graph_store and chunks:
                 self.graph_store.add_entities(list(chunks), list(metadatas))
                 total_graph_tasks += 1
-                self._report(progress_callback, f"图谱实体: {total_graph_tasks}/{page_num + 1} 页")
+                self._report(progress_callback, f"图谱实体: {total_graph_tasks}/{total_pages} 页")
 
         doc.close()
         self._report(progress_callback, f"知识图谱构建完成，共 {total_graph_tasks} 页实体")
