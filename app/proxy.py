@@ -111,3 +111,7 @@ def search_notes(query: str, top_k: int = 5) -> str:
 def task_status(task_id: str | None = None) -> str:
     """查询异步任务状态。不传 task_id 返回所有任务列表。"""
     return _call("/api/task_status", task_id=task_id)
+
+
+if __name__ == "__main__":
+    mcp.run(transport="stdio")

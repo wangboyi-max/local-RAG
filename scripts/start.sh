@@ -16,9 +16,9 @@ fi
 
 # ── 2. 确保 venv + 依赖 ─────────────────────────────────
 if [ ! -d ".venv" ]; then
-    echo "[local-rag] 首次启动：创建虚拟环境..."
+    echo "[local-rag] 首次启动：创建虚拟环境..." >&2
     if command -v uv &>/dev/null; then
-        uv venv
+        uv venv 2>&1 >&2
     fi
     PYTHON=".venv/bin/python"
 else
@@ -27,18 +27,18 @@ fi
 
 # 检查关键依赖是否已安装（每次启动自动同步）
 if ! "$PYTHON" -c "import pydantic, httpx, mcp" 2>/dev/null; then
-    echo "[local-rag] 安装/更新依赖..."
+    echo "[local-rag] 安装/更新依赖..." >&2
     if command -v uv &>/dev/null; then
-        uv pip install -e .
+        uv pip install -e . 2>&1 >&2
     else
-        "$PYTHON" -m pip install -e .
+        "$PYTHON" -m pip install -e . >&2
     fi
 fi
 
 # ── 3. 确保 .env ─────────────────────────────────────────
 if [ ! -f ".env" ] && [ -f ".env.example" ]; then
     cp .env.example .env
-    echo "[local-rag] 已从 .env.example 创建 .env，请编辑 .env 设置 LLM_API_KEY"
+    echo "[local-rag] 已从 .env.example 创建 .env，请编辑 .env 设置 LLM_API_KEY" >&2
 fi
 
 # ── 4. 设置数据目录 ──────────────────────────────────────
@@ -77,15 +77,15 @@ fi
 DAEMON_PORT="${LOCAL_RAG_DAEMON_PORT:-27890}"
 
 if curl -s --max-time 1 "http://localhost:${DAEMON_PORT}/health" > /dev/null 2>&1; then
-    echo "[local-rag] Daemon 已在运行 (port ${DAEMON_PORT})"
+    echo "[local-rag] Daemon 已在运行 (port ${DAEMON_PORT})" >&2
 else
-    echo "[local-rag] 启动 daemon..."
+    echo "[local-rag] 启动 daemon..." >&2
     "$PYTHON" -m app.daemon >> "$LOCAL_RAG_DATA_DIR/daemon.log" 2>&1 &
 
     # 等待 daemon 就绪（最长 30 秒）
     for i in $(seq 1 60); do
         if curl -s --max-time 1 "http://localhost:${DAEMON_PORT}/health" > /dev/null 2>&1; then
-            echo "[local-rag] Daemon 就绪"
+            echo "[local-rag] Daemon 就绪" >&2
             break
         fi
         sleep 0.5
