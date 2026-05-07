@@ -34,7 +34,7 @@ class DaemonServer:
         ocr = OCRService()
         vector_store = VectorStoreService()
         graph_store = GraphStoreService()
-        task_tracker = TaskTrackerService()
+        task_tracker = TaskTrackerService(state_file=f"{self.data_dir}/tasks.json")
 
         self.note_store = NoteStoreService(
             vector_store=vector_store,

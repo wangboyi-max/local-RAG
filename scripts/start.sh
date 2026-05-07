@@ -41,22 +41,22 @@ if [ ! -f ".env" ] && [ -f ".env.example" ]; then
     echo "[local-rag] 已从 .env.example 创建 .env，请编辑 .env 设置 LLM_API_KEY" >&2
 fi
 
-# ── 4. 设置数据目录 ──────────────────────────────────────
-if [ -z "$LOCAL_RAG_DATA_DIR" ]; then
+# ── 4. 设置工作路径 ───────────────────────────────────────
+if [ -z "$LOCAL_RAG_WORK_DIR" ]; then
     # 优先读 .env 里的配置
     if [ -f ".env" ]; then
-        _env_val=$(grep '^LOCAL_RAG_DATA_DIR=' ".env" 2>/dev/null | head -1 | cut -d= -f2-)
+        _env_val=$(grep '^LOCAL_RAG_WORK_DIR=' ".env" 2>/dev/null | head -1 | cut -d= -f2-)
         if [ -n "$_env_val" ]; then
-            export LOCAL_RAG_DATA_DIR="$_env_val"
+            export LOCAL_RAG_WORK_DIR="$_env_val"
         fi
     fi
     # 没有则用默认路径
-    if [ -z "$LOCAL_RAG_DATA_DIR" ]; then
-        export LOCAL_RAG_DATA_DIR="${HOME}/.local/share/local-rag"
+    if [ -z "$LOCAL_RAG_WORK_DIR" ]; then
+        export LOCAL_RAG_WORK_DIR="${HOME}/.local/share/local-rag"
     fi
 fi
 
-mkdir -p "$LOCAL_RAG_DATA_DIR/chroma_db" "$LOCAL_RAG_DATA_DIR/uploads" "$LOCAL_RAG_DATA_DIR/notes"
+# config.py 会自动创建子目录，这里不手动创建
 
 # ── 5. 确保 Neo4j 容器运行 ───────────────────────────────
 if command -v docker &>/dev/null; then
@@ -85,7 +85,7 @@ if _health_check; then
     echo "[local-rag] Daemon 已在运行 (port ${DAEMON_PORT})" >&2
 else
     echo "[local-rag] 启动 daemon..." >&2
-    "$PYTHON" -m app.daemon >> "$LOCAL_RAG_DATA_DIR/daemon.log" 2>&1 &
+    "$PYTHON" -m app.daemon >> "$LOCAL_RAG_WORK_DIR/daemon.log" 2>&1 &
 
     # 等待 daemon 就绪（最长 60 秒）
     for i in $(seq 1 120); do

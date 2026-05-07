@@ -76,22 +76,23 @@ git pull
 bash scripts/upgrade.sh
 ```
 
-升级只替换代码，外部数据目录 `~/.local/share/local-rag/` 完全不受影响。迁移系统在启动时自动检测版本差异并执行。
+升级只替换代码，外部工作路径完全不受影响。迁移系统在启动时自动检测版本差异并执行。
 
 ## 数据目录
 
 ```
-~/.local/share/local-rag/
+<work_dir>/
 ├── chroma_db/          # ChromaDB 向量数据
 ├── uploads/            # 已索引文件
 ├── notes/              # Markdown 笔记（纯 .md 文件）
 │   ├── *.md
 │   └── index.json      # 笔记元数据索引
 ├── tasks.json          # 异步任务状态
+├── daemon.log          # Daemon 运行日志
 └── .installed_version  # 当前安装的版本号
 ```
 
-可通过 `LOCAL_RAG_DATA_DIR` 环境变量或 `.env` 自定义路径。
+通过 `LOCAL_RAG_WORK_DIR` 环境变量或 `.env` 自定义路径。用户只需设置一个路径，所有子目录自动创建。
 
 ## 下载嵌入模型
 
@@ -123,7 +124,7 @@ python -c "from modelscope import snapshot_download; snapshot_download('BAAI/bge
 
 | 环境变量 | 说明 | 默认值 |
 |----------|------|--------|
-| `LOCAL_RAG_DATA_DIR` | 外部数据目录 | `~/.local/share/local-rag` |
+| `LOCAL_RAG_WORK_DIR` | 工作路径（所有数据存子目录） | `~/.local/share/local-rag` |
 | `LOCAL_RAG_DAEMON_PORT` | Daemon HTTP 端口 | `27890` |
 | `EMBEDDING_MODEL` | 嵌入模型 | `BAAI/bge-m3` |
 | `EMBEDDING_DEVICE` | 嵌入设备 | `cpu` |

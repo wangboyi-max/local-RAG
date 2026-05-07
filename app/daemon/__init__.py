@@ -11,7 +11,7 @@ def main():
 
     # 确定数据目录
     from app.config import settings
-    data_dir = settings.data_dir
+    data_dir = settings.work_dir
 
     # 运行迁移
     try:
