@@ -25,7 +25,7 @@ class IngestionPipeline:
         self.graph_store = graph_store
         self.chunker = get_paragraph_aware_text_splitter()
 
-    def ingest(self, file_path: str) -> dict:
+    def ingest(self, file_path: str, progress_callback=None) -> dict:
         ext = os.path.splitext(file_path)[1].lower()
         if ext not in SUPPORTED_EXTENSIONS:
             raise ValueError(f"不支持的文件格式: {ext}")
@@ -42,71 +42,64 @@ class IngestionPipeline:
             action = "replaced"
 
         if ext == ".pdf":
-            return self._ingest_pdf(file_path, source, action)
+            return self._ingest_pdf(file_path, source, action, progress_callback)
         else:
             return self._ingest_image(file_path, source, action)
 
-    def _ingest_pdf(self, pdf_path: str, source: str, action: str) -> dict:
-        import fitz
+    def _report(self, progress_callback, message):
+        if progress_callback:
+            progress_callback(message)
 
-        print(f"[Ingestion] 开始处理 PDF: {source}", file=sys.stderr, flush=True)
+    def _ingest_pdf(self, pdf_path: str, source: str, action: str, progress_callback=None) -> dict:
+        import fitz
 
         doc = fitz.open(pdf_path)
         total_pages = len(doc)
         total_chunks = 0
+        total_graph_tasks = 0
 
-        # 使用线程池：OCR 主线程 + 图谱实体提取后台线程并行
-        graph_futures = []
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            for page_num in range(total_pages):
-                page = doc[page_num]
-                # OCR（主线程）
-                pix = page.get_pixmap(dpi=settings.ocr_dpi)
-                from PIL import Image
-                image = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-                text = self.ocr.extract_text_from_image(image)
-                pix = None  # 释放内存
+        # 第一遍：统计需要 OCR 的页数
+        for page_num in range(total_pages):
+            page = doc[page_num]
+            pix = page.get_pixmap(dpi=settings.ocr_dpi)
+            from PIL import Image
+            image = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+            text = self.ocr.extract_text_from_image(image)
+            pix = None
 
-                if not text.strip():
-                    continue
+            if not text.strip():
+                continue
 
-                # 切分 + 向量存储
-                chunks = self.chunker.split_text(text)
-                if not chunks:
-                    continue
+            chunks = self.chunker.split_text(text)
+            if not chunks:
+                continue
 
-                ids = [f"{source}-{uuid.uuid4().hex[:8]}-{i}" for i in range(len(chunks))]
-                metadatas = [
-                    {
-                        "source": source,
-                        "page": page_num + 1,
-                        "chunk_index": i,
-                        "chunk_id": ids[i],
-                        "ingested_at": datetime.now(timezone.utc).isoformat(),
-                    }
-                    for i in range(len(chunks))
-                ]
-                self.vector_store.add_documents(chunks, metadatas, ids)
-                total_chunks += len(chunks)
-                print(f"[Ingestion] 第 {page_num + 1}/{total_pages} 页，切分 {len(chunks)} 个块，累计 {total_chunks} 个", file=sys.stderr, flush=True)
+            ids = [f"{source}-{uuid.uuid4().hex[:8]}-{i}" for i in range(len(chunks))]
+            metadatas = [
+                {
+                    "source": source,
+                    "page": page_num + 1,
+                    "chunk_index": i,
+                    "chunk_id": ids[i],
+                    "ingested_at": datetime.now(timezone.utc).isoformat(),
+                }
+                for i in range(len(chunks))
+            ]
+            self.vector_store.add_documents(chunks, metadatas, ids)
+            total_chunks += len(chunks)
 
-                # 图谱实体提取（提交到线程池，与后续 OCR 并行）
-                if self.graph_store and chunks:
-                    future = executor.submit(
-                        self.graph_store.add_entities, list(chunks), list(metadatas)
-                    )
-                    graph_futures.append(future)
+            self._report(progress_callback, f"OCR + 向量化: {page_num + 1}/{total_pages} 页，累计 {total_chunks} 个文本块")
 
-            print(f"[Ingestion] OCR 和向量索引完成，等待 {len(graph_futures)} 个图谱提取任务...", file=sys.stderr, flush=True)
-            # 等待所有图谱提取完成
-            for i, future in enumerate(as_completed(graph_futures)):
-                try:
-                    future.result()
-                except Exception as e:
-                    print(f"[Ingestion] 图谱提取任务 {i+1} 出错: {e}", file=sys.stderr, flush=True)
-            print(f"[Ingestion] 知识图谱构建完成", file=sys.stderr, flush=True)
+            # 图谱实体提取（提交到线程池，与后续 OCR 并行）
+            if self.graph_store and chunks:
+                self.graph_store.add_entities(list(chunks), list(metadatas))
+                total_graph_tasks += 1
+                self._report(progress_callback, f"图谱实体: {total_graph_tasks}/{page_num + 1} 页")
 
         doc.close()
+        self._report(progress_callback, f"知识图谱构建完成，共 {total_graph_tasks} 页实体")
+        self._report(progress_callback, f"完成: {total_pages} 页，{total_chunks} 个文本块")
+
         return {
             "source": source,
             "pages": total_pages,
