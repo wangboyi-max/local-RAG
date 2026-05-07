@@ -147,10 +147,15 @@ class _RequestHandler(BaseHTTPRequestHandler):
         )
 
     def _handle_delete_docs(self, source: str) -> str:
+        import os
         with _write_lock:
             count = self.retrieval.vector_store.delete_by_source(source)
             if self.graph_store:
                 self.graph_store.delete_by_source(source)
+            # 清理 uploads 副本
+            upload_path = os.path.join(settings.upload_dir, source)
+            if os.path.isfile(upload_path):
+                os.remove(upload_path)
         if count > 0:
             return f"已删除 `{source}`，共移除 {count} 个文本块。"
         return f"未找到名为 `{source}` 的文档。"
@@ -325,6 +330,7 @@ def _format_note(note: dict) -> str:
 
 
 def _format_task(task: dict) -> str:
+    from datetime import datetime, timezone
     status_map = {"pending": "⏳ 等待中", "running": "🔄 执行中", "completed": "✅ 已完成", "failed": "❌ 失败"}
     icon = status_map.get(task["status"], task["status"])
     lines = [f"任务 ID: `{task['task_id']}`"]
@@ -338,4 +344,5 @@ def _format_task(task: dict) -> str:
         lines.append(f"错误: {task['error']}")
     lines.append(f"创建: {task['created_at'][:19]}")
     lines.append(f"更新: {task['updated_at'][:19]}")
+    lines.append(f"查询: {datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S')}")
     return "\n".join(lines)
