@@ -15,9 +15,24 @@
 ## 架构
 
 ```
+Claude Code 1 (stdio proxy) ─┐
+Claude Code 2 (stdio proxy) ─┤──→ HTTP localhost:27890 ──→ Daemon（单进程）
+Claude Code 3 (stdio proxy) ─┘                                ↓
+                                                       ChromaDB / Neo4j / FS
+```
+
+**Daemon**（常驻进程）：持有所有重资源单例（PaddleOCR、BGE-M3、ChromaDB、Neo4j 连接），写操作通过 `threading.Lock` 串行化保护，读操作并发执行。
+
+**Proxy**（薄 stdio 进程）：每个 Claude Code 连接启动一个独立 proxy 进程，仅通过 httpx 将工具调用转发到 daemon。启动 ~100ms，零 ML 依赖。
+
+**文档处理流程：**
+```
 文档 → OCR → 切分 → ┬→ ChromaDB (向量索引)
                      └→ Neo4j (知识图谱：实体/关系)
+```
 
+**查询流程：**
+```
 查询 → ┬→ 向量语义检索（余弦相似度）
        ├→ BM25 关键词匹配
        └→ 图谱实体扩展（BFS 共现关联）
@@ -109,6 +124,7 @@ python -c "from modelscope import snapshot_download; snapshot_download('BAAI/bge
 | 环境变量 | 说明 | 默认值 |
 |----------|------|--------|
 | `LOCAL_RAG_DATA_DIR` | 外部数据目录 | `~/.local/share/local-rag` |
+| `LOCAL_RAG_DAEMON_PORT` | Daemon HTTP 端口 | `27890` |
 | `EMBEDDING_MODEL` | 嵌入模型 | `BAAI/bge-m3` |
 | `EMBEDDING_DEVICE` | 嵌入设备 | `cpu` |
 | `NEO4J_URI` | Neo4j 连接 | `bolt://localhost:7687` |
