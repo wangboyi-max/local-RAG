@@ -24,8 +24,8 @@ dependencies = [
     # Embeddings
     "sentence-transformers>=3.3.0",
 
-    # OCR (默认 CPU，GPU 版本需手动升级)
-    "paddlepaddle>=3.0.0",
+    # OCR
+    "paddlepaddle-gpu>=3.3.0",
     "paddleocr>=3.0.0",
     "PyMuPDF>=1.24.0",
 
@@ -49,6 +49,8 @@ dev = [
 
 [tool.uv]
 index-url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+extra-index-url = ["https://www.paddlepaddle.org.cn/packages/stable/cu130/"]
+index-strategy = "unsafe-best-match"
 
 [build-system]
 requires = ["hatchling"]
