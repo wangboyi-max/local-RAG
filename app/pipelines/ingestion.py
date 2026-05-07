@@ -4,7 +4,7 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 
-from app.services.chunking import get_chinese_text_splitter
+from app.services.chunking import get_paragraph_aware_text_splitter
 from app.services.ocr import OCRService
 from app.services.vector_store import VectorStoreService
 from app.services.graph_store import GraphStoreService
@@ -23,7 +23,7 @@ class IngestionPipeline:
         self.ocr = ocr
         self.vector_store = vector_store
         self.graph_store = graph_store
-        self.chunker = get_chinese_text_splitter()
+        self.chunker = get_paragraph_aware_text_splitter()
 
     def ingest(self, file_path: str) -> dict:
         ext = os.path.splitext(file_path)[1].lower()
@@ -75,16 +75,17 @@ class IngestionPipeline:
                 if not chunks:
                     continue
 
+                ids = [f"{source}-{uuid.uuid4().hex[:8]}-{i}" for i in range(len(chunks))]
                 metadatas = [
                     {
                         "source": source,
                         "page": page_num + 1,
                         "chunk_index": i,
+                        "chunk_id": ids[i],
                         "ingested_at": datetime.now(timezone.utc).isoformat(),
                     }
                     for i in range(len(chunks))
                 ]
-                ids = [f"{source}-{uuid.uuid4().hex[:8]}-{i}" for i in range(len(chunks))]
                 self.vector_store.add_documents(chunks, metadatas, ids)
                 total_chunks += len(chunks)
                 print(f"[Ingestion] 第 {page_num + 1}/{total_pages} 页，切分 {len(chunks)} 个块，累计 {total_chunks} 个", file=sys.stderr, flush=True)
@@ -123,13 +124,12 @@ class IngestionPipeline:
         if not chunks:
             return {"source": source, "pages": 1, "chunks": 0, "action": action}
 
-        texts = chunks
+        ids = [f"{source}-{uuid.uuid4().hex[:8]}-{i}" for i in range(len(texts))]
         now = datetime.now(timezone.utc).isoformat()
         metadatas = [
-            {"source": source, "page": 1, "chunk_index": i, "ingested_at": now}
+            {"source": source, "page": 1, "chunk_index": i, "chunk_id": ids[i], "ingested_at": now}
             for i in range(len(texts))
         ]
-        ids = [f"{source}-{uuid.uuid4().hex[:8]}-{i}" for i in range(len(texts))]
         self.vector_store.add_documents(texts, metadatas, ids)
 
         # 写入图谱

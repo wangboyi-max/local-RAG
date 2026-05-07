@@ -11,11 +11,12 @@ class Settings(BaseSettings):
     chroma_collection_name: str = "documents"
 
     # 文本切分
-    chunk_size: int = 500
-    chunk_overlap: int = 100
+    chunk_size: int = 1500
+    chunk_overlap: int = 200
 
     # 检索
     top_k: int = 4
+    bm25_enabled: bool = True
 
     # OCR
     ocr_languages: str = "ch,en"

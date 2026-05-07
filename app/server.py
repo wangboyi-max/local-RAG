@@ -1,4 +1,5 @@
 import os
+import re
 
 from mcp.server.fastmcp import FastMCP
 
@@ -251,18 +252,31 @@ def task_status(task_id: str | None = None) -> str:
 
 
 def _format_chunks(chunks: list[dict]) -> str:
-    vector_count = sum(1 for c in chunks if c.get("source_type") == "vector")
-    graph_count = sum(1 for c in chunks if c.get("source_type") == "graph")
-    lines = [
-        f"找到 {len(chunks)} 个相关文本块（向量检索 {vector_count} 条，图谱扩展 {graph_count} 条）：\n"
-    ]
+    """格式化检索结果为可读文本。"""
+    source_types = {"vector": "向量", "bm25": "关键词", "graph": "图谱"}
+    type_counts = {}
+    for c in chunks:
+        st = c.get("source_type", "vector")
+        type_counts[st] = type_counts.get(st, 0) + 1
+    summary_parts = [f"{source_types.get(st, st)} {n} 条" for st, n in type_counts.items()]
+    lines = [f"找到 {len(chunks)} 个相关结果（{', '.join(summary_parts)}）：\n"]
     for i, c in enumerate(chunks, 1):
-        tag = "[图谱]" if c.get("source_type") == "graph" else "[向量]"
+        st = c.get("source_type", "vector")
+        tag = f"[{source_types.get(st, st)}]"
+        score_str = f"[相关度: {c['score']}]" if c.get("score") is not None else ""
         lines.append(
-            f"--- [{i}] {tag} {c['source']} (第{c['page']}页) [相似度: {c['score']}]\n"
-            f"{c['text']}\n"
+            f"--- [{i}] {tag} {c['source']} (第{c['page']}页){score_str}\n"
+            f"{_clean_ocr_text(c['text'])}\n"
         )
     return "\n".join(lines)
+
+
+def _clean_ocr_text(text: str) -> str:
+    """清理 OCR 文本中的格式问题：合并连续空行、去除行首尾多余空格。"""
+    lines = text.splitlines()
+    cleaned = [line.strip() for line in lines]
+    merged = re.sub(r"\n{3,}", "\n\n", "\n".join(cleaned))
+    return merged.strip()
 
 
 def _format_note(note: dict) -> str:

@@ -6,6 +6,16 @@ from app.services.vector_store import VectorStoreService
 from app.services.graph_store import GraphStoreService, STOP_WORDS
 
 
+def _chunk_key(meta: dict | None) -> str:
+    """生成 chunk 的唯一标识，用于去重。优先用 chunk_id，回退到 source+page+chunk_index。"""
+    if meta and meta.get("chunk_id"):
+        return meta["chunk_id"]
+    if meta and meta.get("source") and meta.get("page") is not None:
+        ci = meta.get("chunk_index", 0)
+        return f"{meta['source']}|{meta['page']}|{ci}"
+    return ""
+
+
 class RetrievalPipeline:
     def __init__(
         self,
@@ -17,33 +27,50 @@ class RetrievalPipeline:
         self.embeddings = get_embeddings()
 
     def search(self, query: str, top_k: int | None = None) -> list[dict]:
-        """混合检索：向量语义 + 图谱实体扩展，合并去重后返回。"""
+        """三路混合检索：BM25 关键词 + 向量语义 + 图谱扩展，合并去重后排序返回。"""
         k = top_k or settings.top_k
 
-        # 1. 向量检索
-        query_embedding = self.embeddings.embed_query(query)
-        results = self.vector_store.query(query_embedding, top_k=k)
+        seen_keys: set[str] = set()
+        merged_results: list[dict] = []
 
-        vector_chunks = []
-        seen_chunk_ids = set()
-        if results.get("documents") and results["documents"][0]:
-            docs = results["documents"][0]
-            metadatas = results.get("metadatas", [None] * len(docs))[0] or []
-            distances = results.get("distances", [[]])[0] or []
+        # 1. BM25 关键词检索（精确匹配，优先）
+        bm25_chunks = self.vector_store.bm25_query(query, top_k=k)
+        for chunk in bm25_chunks:
+            key = _chunk_key({
+                "chunk_id": chunk.get("chunk_id"),
+                "source": chunk.get("source"),
+                "page": chunk.get("page"),
+                "chunk_index": chunk.get("chunk_index"),
+            })
+            if key:
+                seen_keys.add(key)
+            merged_results.append(chunk)
+
+        # 2. 向量语义检索（语义理解）
+        candidate_k = max(k, len(merged_results)) + k
+        query_embedding = self.embeddings.embed_query(query)
+        vector_results = self.vector_store.query(query_embedding, top_k=candidate_k)
+        if vector_results.get("documents") and vector_results["documents"][0]:
+            docs = vector_results["documents"][0]
+            metadatas = vector_results.get("metadatas", [None] * len(docs))[0] or []
+            distances = vector_results.get("distances", [[]])[0] or []
             for i, (doc, meta) in enumerate(zip(docs, metadatas)):
-                chunk_id = meta.get("chunk_id", "") if meta else ""
-                vector_chunks.append({
+                key = _chunk_key(meta)
+                if key and key in seen_keys:
+                    continue
+                merged_results.append({
                     "text": doc,
                     "source": meta.get("source", "unknown") if meta else "unknown",
                     "page": meta.get("page", "?") if meta else "?",
-                    "score": round(distances[i], 4) if i < len(distances) else None,
+                    "chunk_id": meta.get("chunk_id", "") if meta else "",
+                    "chunk_index": meta.get("chunk_index", 0) if meta else 0,
+                    "score": round(1 - distances[i], 4) if i < len(distances) else None,
                     "source_type": "vector",
                 })
-                if chunk_id:
-                    seen_chunk_ids.add(chunk_id)
+                if key:
+                    seen_keys.add(key)
 
-        # 2. 图谱检索（如果可用）
-        graph_chunks = []
+        # 3. 图谱扩展补充（实体关系）
         if self.graph_store:
             keywords = jieba.analyse.extract_tags(query, topK=10, withWeight=False)
             keywords = [w for w in keywords if w not in STOP_WORDS and len(w) > 1]
@@ -53,15 +80,19 @@ class RetrievalPipeline:
                 )
                 for r in graph_results:
                     cid = r.get("chunkId", "")
-                    if cid and cid not in seen_chunk_ids:
-                        graph_chunks.append({
+                    if cid and cid not in seen_keys:
+                        merged_results.append({
                             "text": r["text"],
                             "source": r["source"],
                             "page": r["page"],
                             "score": None,
                             "source_type": "graph",
                         })
-                        seen_chunk_ids.add(cid)
+                        seen_keys.add(cid)
 
-        # 3. 合并：向量结果在前，图谱扩展结果追加
-        return vector_chunks + graph_chunks
+        # 4. 排序：有分数的（向量）按相似度降序在前，无分数的（BM25/图谱）追加
+        scored = [r for r in merged_results if r.get("score") is not None]
+        unscored = [r for r in merged_results if r.get("score") is None]
+        scored.sort(key=lambda x: x["score"], reverse=True)
+
+        return (scored + unscored)[:k]
