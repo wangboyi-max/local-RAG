@@ -136,8 +136,10 @@ class _RequestHandler(BaseHTTPRequestHandler):
         return f"文件索引任务已提交，正在后台处理。\n任务 ID: `{task_id}`\n请用 `task_status` 查询进度。"
 
     def _ingest_background(self, file_path: str, task_id: str):
+        def progress(msg):
+            self.task_tracker.update_task(task_id, progress=msg)
         with _write_lock:
-            result = self.ingestion.ingest(file_path)
+            result = self.ingestion.ingest(file_path, progress_callback=progress)
         action_text = "重新索引（覆盖）" if result["action"] == "replaced" else "索引"
         self.task_tracker.update_task(
             task_id, status=TaskStatus.COMPLETED,
