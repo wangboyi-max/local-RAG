@@ -13,7 +13,7 @@ from app.pipelines.retrieval import RetrievalPipeline
 
 mcp = FastMCP(
     "Graph RAG",
-    instructions="本地 Graph RAG 检索服务，支持 OCR 处理 PDF/图片，结合 Neo4j 知识图谱和向量混合检索。",
+    instructions="本地 Graph RAG 检索服务，支持 OCR 处理扫描版 PDF/图片，结合 Neo4j 知识图谱和向量混合检索。",
 )
 
 
@@ -148,12 +148,12 @@ def create_note(title: str, content: str, tags: str | None = None) -> str:
 
 
 @mcp.tool()
-def get_note(note_id: str) -> str:
-    """获取指定笔记的完整内容。"""
+def get_note(title: str) -> str:
+    """获取指定笔记的完整内容。title 为笔记文件名（标题）。"""
     note_store = _get_note_store()
-    note = note_store.get_note(note_id)
+    note = note_store.get_note(title)
     if not note:
-        return f"未找到笔记：{note_id}"
+        return f"未找到笔记：{title}"
     return _format_note(note)
 
 
@@ -170,22 +170,22 @@ def list_notes(tag: str | None = None) -> str:
     for n in notes:
         tag_str = f" [{', '.join(n['tags'])}]" if n.get("tags") else ""
         lines.append(
-            f"- `{n['id']}` **{n['title']}**{tag_str}\n"
+            f"- **{n['title']}**{tag_str}\n"
             f"  更新于: {n['updated_at'][:19]}"
         )
     return "\n".join(lines)
 
 
 @mcp.tool()
-def update_note(note_id: str, title: str | None = None, content: str | None = None, tags: str | None = None) -> str:
-    """更新 Markdown 笔记。内容变动时会异步重新同步到 RAG。tags 为逗号分隔的标签。"""
+def update_note(title: str, content: str | None = None, tags: str | None = None, new_title: str | None = None) -> str:
+    """更新笔记。按标题定位，可更新内容、标签或重命名。内容变动会异步重建 RAG。"""
     try:
         note_store = _get_note_store()
         tag_list = [t.strip() for t in tags.split(",")] if tags else None
-        task_id = note_store.update_note(note_id, title=title, content=content, tags=tag_list)
+        task_id = note_store.update_note(title, content=content, tags=tag_list, new_title=new_title)
         if task_id is None:
-            return f"笔记 `{note_id}` 已更新（仅标题/标签，无需重建 RAG）"
-        return f"笔记 `{note_id}` 内容已更新，正在重新同步到 RAG。\n任务 ID: `{task_id}`\n请用 `task_status` 查询同步进度。"
+            return f"笔记 `{title}` 已更新（仅标题/标签，无需重建 RAG）"
+        return f"笔记 `{title}` 内容已更新，正在重新同步到 RAG。\n任务 ID: `{task_id}`\n请用 `task_status` 查询同步进度。"
     except ValueError as e:
         return f"更新失败：{e}"
     except Exception as e:
@@ -193,12 +193,25 @@ def update_note(note_id: str, title: str | None = None, content: str | None = No
 
 
 @mcp.tool()
-def delete_note(note_id: str) -> str:
-    """删除笔记及其所有 RAG 索引数据。"""
+def reindex_note(title: str) -> str:
+    """重新索引指定笔记到 RAG（手动触发）。按标题定位，适用于外部编辑 .md 文件后重建索引。"""
+    try:
+        note_store = _get_note_store()
+        ok = note_store.reindex_from_file(title)
+        if ok:
+            return f"笔记 `{title}` 已重新索引到 RAG。"
+        return f"笔记 `{title}` 重新索引失败（文件可能不存在或内容为空）。"
+    except Exception as e:
+        return f"重新索引失败：{e}"
+
+
+@mcp.tool()
+def delete_note(title: str) -> str:
+    """删除笔记及其所有 RAG 索引数据。按标题定位。"""
     note_store = _get_note_store()
-    if note_store.delete_note(note_id):
-        return f"笔记 `{note_id}` 及其 RAG 数据已删除。"
-    return f"未找到笔记：{note_id}"
+    if note_store.delete_note(title):
+        return f"笔记 `{title}` 及其 RAG 数据已删除。"
+    return f"未找到笔记：{title}"
 
 
 @mcp.tool()
@@ -282,7 +295,7 @@ def _clean_ocr_text(text: str) -> str:
 def _format_note(note: dict) -> str:
     tag_str = f"\n标签: {', '.join(note['tags'])}" if note.get("tags") else ""
     return (
-        f"📝 `{note['id']}` **{note['title']}**\n"
+        f"📝 **{note['title']}**\n"
         f"创建: {note['created_at'][:19]}\n"
         f"更新: {note['updated_at'][:19]}"
         f"{tag_str}\n"
