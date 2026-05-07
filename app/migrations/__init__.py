@@ -23,8 +23,10 @@ def get_code_version() -> str:
     return "0.0.0"
 
 
-def get_installed_version(data_dir: str = "./data") -> str:
+def get_installed_version(data_dir: str = "") -> str:
     """从数据目录的 .installed_version 文件读取已安装版本。"""
+    if not data_dir:
+        data_dir = str(Path.home() / ".local" / "share" / "local-rag")
     marker = Path(data_dir) / ".installed_version"
     if marker.exists():
         return marker.read_text().strip()
@@ -42,8 +44,10 @@ def _write_installed_version(data_dir: str, version: str):
     marker.write_text(version)
 
 
-def run_migrations(data_dir: str = "./data"):
+def run_migrations(data_dir: str = ""):
     """执行所有待运行的迁移。"""
+    if not data_dir:
+        data_dir = str(Path.home() / ".local" / "share" / "local-rag")
     installed = get_installed_version(data_dir)
     code = get_code_version()
 

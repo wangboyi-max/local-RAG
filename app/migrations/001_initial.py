@@ -8,8 +8,10 @@ logger = logging.getLogger(__name__)
 UPGRADE_TO = "0.2.0"
 
 
-def upgrade(data_dir: str = "./data"):
+def upgrade(data_dir: str = ""):
     """创建外部数据目录结构，迁移旧数据。"""
+    if not data_dir:
+        data_dir = str(Path.home() / ".local" / "share" / "local-rag")
     target = Path(data_dir)
     target.mkdir(parents=True, exist_ok=True)
 

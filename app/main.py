@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 
 if __name__ == "__main__":
     # 确定数据目录
-    data_dir = os.environ.get("LOCAL_RAG_DATA_DIR", "./data")
+    data_dir = os.environ.get("LOCAL_RAG_DATA_DIR", str(Path.home() / ".local" / "share" / "local-rag"))
 
     # 自动运行迁移
     try:

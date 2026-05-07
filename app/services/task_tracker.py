@@ -15,8 +15,12 @@ class TaskStatus(str, Enum):
     FAILED = "failed"
 
 
+from app.config import settings
+
+
 class TaskTrackerService:
-    def __init__(self, state_file: str = "./data/tasks.json"):
+    def __init__(self, state_file: str | None = None):
+        self.state_file = Path(state_file or f"{settings.data_dir}/tasks.json")
         self.state_file = Path(state_file)
         self.state_file.parent.mkdir(parents=True, exist_ok=True)
         self.tasks: dict[str, dict] = {}

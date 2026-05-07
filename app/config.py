@@ -4,18 +4,20 @@ from pathlib import Path
 from pydantic_settings import BaseSettings
 
 # 外部数据目录：插件升级时不破坏数据
-# 优先级: LOCAL_RAG_DATA_DIR 环境变量 > ~/.local/share/local-rag > ./data
+# 优先级: LOCAL_RAG_DATA_DIR 环境变量 > ~/.local/share/local-rag
 _data_dir = os.environ.get("LOCAL_RAG_DATA_DIR")
 if not _data_dir:
     _home = Path.home()
-    _legacy = _home / ".local" / "share" / "local-rag"
-    if _legacy.exists():
-        _data_dir = str(_legacy)
-    else:
-        _data_dir = "./data"
+    _data_dir = str(_home / ".local" / "share" / "local-rag")
+
+# 确保数据目录存在
+Path(_data_dir).mkdir(parents=True, exist_ok=True)
 
 
 class Settings(BaseSettings):
+    # 数据目录根路径
+    data_dir: str = _data_dir
+
     # 嵌入模型
     embedding_model: str = "BAAI/bge-m3"
     embedding_device: str = "cpu"
