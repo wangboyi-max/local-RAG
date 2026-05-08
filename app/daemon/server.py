@@ -212,7 +212,7 @@ class _RequestHandler(BaseHTTPRequestHandler):
 
         with _write_lock:
             # 1. 清空 ChromaDB 向量库
-            self.vector_store.clear_all()
+            self.retrieval.vector_store.clear_all()
             # 2. 清空 Neo4j 图谱
             if self.graph_store:
                 self.graph_store.clear_all()
