@@ -6,8 +6,8 @@ from mcp.server.fastmcp import FastMCP
 from app.config import settings
 
 mcp = FastMCP(
-    "Graph RAG",
-    instructions="本地 Graph RAG 检索服务，支持 OCR 处理扫描版 PDF/图片，结合 Neo4j 知识图谱和向量混合检索。",
+    "Knowledge Hub",
+    instructions="统一知识检索服务——结合本地 Markdown 笔记和 RAG 知识库（PDF/文档），支持 OCR 处理扫描版 PDF/图片，结合 Neo4j 知识图谱和向量混合检索。",
 )
 
 DAEMON_URL = f"http://localhost:{settings.daemon_port}"
