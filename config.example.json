@@ -1,7 +1,7 @@
 {
-  "_comment": "Knowledge Hub 用户配置模板。复制为 config.json 后修改。RAG 服务内部配置请使用 .env",
-  "notes_dir": "~/.local/share/knowledge-hub/notes",
-  "rag_work_dir": "~/.local/share/knowledge-hub/rag",
+  "_comment": "Knowledge Hub 用户配置模板。默认使用当前工作目录下的 .knowledge-hub/，路径由 config.py 自动管理，无需在此设置。",
+  "_notes_dir": "(自动) .knowledge-hub/notes/ — 短文本，Claude Code 直接 Read",
+  "_rag_work_dir": "(自动) .knowledge-hub/rag/ — 长文本，local-rag 索引",
   "embedding_model": "BAAI/bge-m3",
   "embedding_device": "cpu",
   "neo4j_uri": "bolt://localhost:7687",

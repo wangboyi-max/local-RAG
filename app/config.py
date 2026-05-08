@@ -1,4 +1,5 @@
-"""配置管理：用户只需设置一个工作路径，子目录自动创建。"""
+"""配置管理：默认在当前工作目录下 .knowledge-hub/，自动创建 notes/ 和 rag/ 子目录。"""
+import os
 from pathlib import Path
 
 from pydantic import Field
@@ -6,12 +7,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    # 工作路径：用户设置一个路径，所有数据自动存到子目录
+    # 工作路径：默认当前工作目录下的 .knowledge-hub/
     # 环境变量: LOCAL_RAG_WORK_DIR（.env 中设置即可）
-    work_dir: str = Field(
-        default="~/.local/share/local-rag",
-        alias="LOCAL_RAG_WORK_DIR",
-    )
+    work_dir: str = ""
 
     # 嵌入模型
     embedding_model: str = "BAAI/bge-m3"
@@ -62,15 +60,25 @@ class Settings(BaseSettings):
     )
 
     def model_post_init(self, __context) -> None:
-        # 解析工作路径
+        # 默认使用当前工作目录下的 .knowledge-hub/
+        if not self.work_dir:
+            cwd = Path.cwd()
+            # 向上查找 .git 目录，作为项目根
+            project_root = cwd
+            for parent in [cwd] + list(cwd.parents):
+                if (parent / ".git").exists():
+                    project_root = parent
+                    break
+            self.work_dir = str(project_root / ".knowledge-hub")
+
         self.work_dir = str(Path(self.work_dir).expanduser().resolve())
         Path(self.work_dir).mkdir(parents=True, exist_ok=True)
 
-        # 子目录默认基于 work_dir，允许 .env 单独覆盖
+        # 子目录：rag/ 存 RAG 数据，notes/ 存 Markdown 笔记
         if not self.chroma_db_path:
-            self.chroma_db_path = str(Path(self.work_dir) / "chroma_db")
+            self.chroma_db_path = str(Path(self.work_dir) / "rag" / "chroma_db")
         if not self.upload_dir:
-            self.upload_dir = str(Path(self.work_dir) / "uploads")
+            self.upload_dir = str(Path(self.work_dir) / "rag" / "uploads")
         if not self.notes_dir:
             self.notes_dir = str(Path(self.work_dir) / "notes")
 

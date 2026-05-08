@@ -28,7 +28,7 @@ cp .env.example .env
 | `LLM_API_KEY` | `your-api-key-here` | **必改** | LLM API 密钥。使用 jieba 实体提取时可不改 |
 | `NEO4J_PASSWORD` | `ragpassword123` | 推荐 | Neo4j 数据库密码 |
 | `EMBEDDING_DEVICE` | `cpu` | GPU 机器必改 | 设为 `gpu` 启用 GPU 加速 |
-| `LOCAL_RAG_WORK_DIR` | `~/.local/share/local-rag` | 可选 | 自定义 RAG 数据目录 |
+| `LOCAL_RAG_WORK_DIR` | 当前工作目录下的 `.knowledge-hub/` | 可选 | 自定义知识库路径 |
 | `LLM_API_BASE` | `https://api.minimaxi.com/v1` | 可选 | 国内镜像需修改 |
 | `LLM_MODEL` | `MiniMax-M2.7` | 可选 | 任意 OpenAI 兼容模型 |
 | `GRAPH_ENTITY_EXTRACTOR` | `jieba` | 可选 | `jieba`（快速）或 `llm`（高质量） |
@@ -48,6 +48,15 @@ start.sh 会自动完成以下步骤：
 4. 启动 Neo4j Docker 容器（首次自动创建，后续自动启动）
 5. 启动 RAG daemon（HTTP 后端服务）
 6. 连接 stdio proxy（MCP 通信层）
+
+知识库数据存储在 Claude Code 当前工作目录下的 `.knowledge-hub/` 中：
+```
+.knowledge-hub/
+├── notes/          # 短文本 Markdown，Claude Code 直接 Read
+└── rag/            # 长文本 RAG 数据（ChromaDB、uploads、图谱）
+    ├── chroma_db/
+    └── uploads/
+```
 
 首次启动约需 5-10 分钟（依赖安装 + Neo4j 拉取 + 模型下载）。
 
