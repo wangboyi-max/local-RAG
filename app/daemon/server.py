@@ -2,7 +2,8 @@
 import json
 import logging
 import threading
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from socketserver import ThreadingMixIn
 
 from app.config import settings
 from app.services.task_tracker import TaskStatus
@@ -11,6 +12,12 @@ logger = logging.getLogger(__name__)
 
 # 全局写锁，串行化所有突变操作
 _write_lock = threading.Lock()
+
+
+class _ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
+    """多线程 HTTP Server，启用 SO_REUSEADDR 避免端口占用。"""
+    allow_reuse_address = True
+    daemon_threads = True
 
 
 class DaemonServer:
@@ -61,7 +68,7 @@ class DaemonServer:
         _RequestHandler.ingestion = self.ingestion
         _RequestHandler.retrieval = self.retrieval
         _RequestHandler.graph_store = self.graph_store
-        self.server = ThreadingHTTPServer(("", self.port), _RequestHandler)
+        self.server = _ThreadingHTTPServer(("", self.port), _RequestHandler)
         logger.info("[daemon] 启动于 http://localhost:%d", self.port)
         self.server.serve_forever()
 

@@ -1,13 +1,25 @@
 #!/usr/bin/env bash
-# 启动 knowledge-hub MCP Server（Daemon + Proxy 架构）
+# 启动 knowledge-hub MCP Server
 # 首次启动自动完成所有初始化：venv、依赖、.env、Neo4j、数据目录、daemon
 # 所有运行时数据（.venv、ChromaDB、uploads、notes、logs）统一存在 .knowledge-hub/ 下
+#
+# 用法:
+#   bash start.sh              # 默认：启动 daemon 并用 exec 切换为 stdio proxy（MCP 模式）
+#   bash start.sh --daemon-only # 仅启动 daemon（后台 HTTP 服务，可 curl 调用 API）
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(dirname "$SCRIPT_DIR")"
 cd "$PLUGIN_ROOT"
+
+# ── 解析参数 ─────────────────────────────────────────────
+DAEMON_ONLY=false
+for arg in "$@"; do
+    case "$arg" in
+        --daemon-only) DAEMON_ONLY=true ;;
+    esac
+done
 
 # ── 确定知识库工作目录（与 config.py 逻辑一致）────────────
 if [ -z "$LOCAL_RAG_WORK_DIR" ]; then
@@ -89,17 +101,26 @@ if command -v docker &>/dev/null; then
     fi
 fi
 
-# ── 6. 启动 Daemon（如未运行）────────────────────────────
+# ── 6. 启动 Daemon ───────────────────────────────────────
 DAEMON_PORT="${LOCAL_RAG_DAEMON_PORT:-27890}"
 
 _health_check() {
-    response=$(curl -s --max-time 3 "http://localhost:${DAEMON_PORT}/health" 2>/dev/null)
+    response=$(no_proxy=localhost,127.0.0.1 http_proxy= https_proxy= curl -s --max-time 3 "http://localhost:${DAEMON_PORT}/health" 2>/dev/null)
     echo "$response" | grep -q '"ok"'
 }
 
 if _health_check; then
-    : # daemon 已在运行，静默跳过
+    echo "[knowledge-hub] Daemon 已在运行（端口 ${DAEMON_PORT}）" >> "$LOG_FILE"
 else
+    # 检查端口是否被占用（残留进程）
+    if ss -tlnp 2>/dev/null | grep -q ":${DAEMON_PORT} "; then
+        echo "[knowledge-hub] 端口 ${DAEMON_PORT} 被占用，尝试清理..." >> "$LOG_FILE"
+        _pid=$(ss -tlnp 2>/dev/null | grep ":${DAEMON_PORT} " | grep -oP 'pid=\K[0-9]+' | head -1)
+        if [ -n "$_pid" ]; then
+            kill -9 "$_pid" 2>/dev/null || true
+            sleep 2
+        fi
+    fi
     echo "[knowledge-hub] 启动 daemon..." >> "$LOG_FILE"
     "$PYTHON" -m app.daemon >>"$LOG_FILE" 2>&1 &
     DAEMON_PID=$!
@@ -107,7 +128,7 @@ else
     for i in $(seq 1 240); do
         if ! kill -0 $DAEMON_PID 2>/dev/null; then
             echo "[knowledge-hub] daemon 进程异常退出，请检查日志: $LOG_FILE" >> "$LOG_FILE"
-            break
+            exit 1
         fi
         if _health_check; then
             echo "[knowledge-hub] Daemon 就绪 (${i}/2 秒)" >> "$LOG_FILE"
@@ -117,7 +138,13 @@ else
     done
 fi
 
-# ── 7. 启动 stdio Proxy（替换当前 shell 进程）────────────
+# ── 7. MCP 模式：启动 stdio Proxy；或 --daemon-only 模式 ─
+if [ "$DAEMON_ONLY" = true ]; then
+    echo "[knowledge-hub] Daemon 模式：HTTP 服务运行在 http://localhost:${DAEMON_PORT}"
+    echo "[knowledge-hub] 日志: $LOG_FILE"
+    exit 0
+fi
+
 # 静默 stderr，避免干扰 MCP stdio 协议
 exec 2>/dev/null
 exec "$PYTHON" -m app.proxy

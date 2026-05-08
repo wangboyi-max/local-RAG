@@ -13,3 +13,4 @@ build/
 .knowledge-hub/.venv/
 .knowledge-hub/logs/
 .knowledge-hub/rag/
+.knowledge-hub/tasks.json

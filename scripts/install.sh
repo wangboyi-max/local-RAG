@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # knowledge-hub 首次安装检查
-# 实际初始化由 start.sh 自动完成（venv/依赖/.env/Neo4j/数据目录）
+# 实际初始化由 start.sh 自动完成（venv/依赖/.env/数据目录/Neo4j）
 set -e
 
 echo "=== Knowledge Hub 安装检查 ==="
@@ -8,7 +8,7 @@ echo "=== Knowledge Hub 安装检查 ==="
 # 检查前置依赖
 for cmd in python3 docker; do
     if command -v "$cmd" &>/dev/null; then
-        echo "✓ $cmd: $(""$cmd" --version 2>&1 | head -1)"
+        echo "✓ $cmd: $($cmd --version 2>&1 | head -1)"
     else
         echo "✗ 未找到 $cmd，请先安装" >&2
         exit 1
