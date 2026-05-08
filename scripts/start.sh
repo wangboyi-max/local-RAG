@@ -23,7 +23,12 @@ if [ -z "$LOCAL_RAG_WORK_DIR" ]; then
 fi
 
 # 解析为绝对路径
-KB_DIR="$(cd "$(dirname "$LOCAL_RAG_WORK_DIR")" 2>/dev/null && pwd)/$(basename "$LOCAL_RAG_WORK_DIR")" 2>/dev/null || KB_DIR="$(pwd)/.knowledge-hub"
+if [[ "$LOCAL_RAG_WORK_DIR" = /* ]]; then
+    KB_DIR="$LOCAL_RAG_WORK_DIR"
+else
+    KB_DIR="$(pwd)/$LOCAL_RAG_WORK_DIR"
+fi
+KB_DIR="$(cd "$(dirname "$KB_DIR")" 2>/dev/null && pwd)/$(basename "$KB_DIR")" 2>/dev/null || KB_DIR="$(pwd)/.knowledge-hub"
 mkdir -p "$KB_DIR"
 
 # ── 日志目录 ─────────────────────────────────────────────
@@ -97,10 +102,15 @@ if _health_check; then
 else
     echo "[knowledge-hub] 启动 daemon..." >> "$LOG_FILE"
     "$PYTHON" -m app.daemon >>"$LOG_FILE" 2>&1 &
-    # 等待 daemon 就绪（最长 60 秒）
-    for i in $(seq 1 120); do
+    DAEMON_PID=$!
+    # 等待 daemon 就绪（PaddleOCR 加载可能需 30-60 秒，最长等 120 秒）
+    for i in $(seq 1 240); do
+        if ! kill -0 $DAEMON_PID 2>/dev/null; then
+            echo "[knowledge-hub] daemon 进程异常退出，请检查日志: $LOG_FILE" >> "$LOG_FILE"
+            break
+        fi
         if _health_check; then
-            echo "[knowledge-hub] Daemon 就绪" >> "$LOG_FILE"
+            echo "[knowledge-hub] Daemon 就绪 (${i}/2 秒)" >> "$LOG_FILE"
             break
         fi
         sleep 0.5

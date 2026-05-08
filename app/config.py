@@ -62,14 +62,7 @@ class Settings(BaseSettings):
     def model_post_init(self, __context) -> None:
         # 默认使用当前工作目录下的 .knowledge-hub/
         if not self.work_dir:
-            cwd = Path.cwd()
-            # 向上查找 .git 目录，作为项目根
-            project_root = cwd
-            for parent in [cwd] + list(cwd.parents):
-                if (parent / ".git").exists():
-                    project_root = parent
-                    break
-            self.work_dir = str(project_root / ".knowledge-hub")
+            self.work_dir = str(Path.cwd() / ".knowledge-hub")
 
         self.work_dir = str(Path(self.work_dir).expanduser().resolve())
         Path(self.work_dir).mkdir(parents=True, exist_ok=True)

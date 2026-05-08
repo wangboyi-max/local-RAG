@@ -42,23 +42,31 @@ bash scripts/start.sh
 ```
 
 start.sh 会自动完成以下步骤：
-1. 创建 Python 虚拟环境（`.venv/`）
+1. 创建 Python 虚拟环境（`.knowledge-hub/.venv/`）
 2. 安装依赖（`pyproject.toml` 已配置清华 PyPI 镜像 + PaddlePaddle CUDA 13.0 镜像）
 3. 从 `.env.example` 创建 `.env`（如果不存在）
 4. 启动 Neo4j Docker 容器（首次自动创建，后续自动启动）
 5. 启动 RAG daemon（HTTP 后端服务）
 6. 连接 stdio proxy（MCP 通信层）
 
-知识库数据存储在 Claude Code 当前工作目录下的 `.knowledge-hub/` 中：
+### 知识库目录结构
+
+所有运行时数据存在当前工作目录下的 `.knowledge-hub/` 中：
 ```
 .knowledge-hub/
-├── notes/          # 短文本 Markdown，Claude Code 直接 Read
-└── rag/            # 长文本 RAG 数据（ChromaDB、uploads、图谱）
-    ├── chroma_db/
-    └── uploads/
+├── .venv/           ← Python 虚拟环境（自动创建）
+├── notes/           ← 短文本 Markdown（Claude Code 直接 Read，可 git 跟踪）
+├── rag/             ← 长文本 RAG 数据
+│   ├── chroma_db/   ← 向量数据库
+│   └── uploads/     ← 索引文件副本
+└── logs/            ← 启动日志
 ```
 
-首次启动约需 5-10 分钟（依赖安装 + Neo4j 拉取 + 模型下载）。
+> **重要**：知识库与 skill 源码分离，skill 升级不影响知识库数据。
+
+### 已知问题
+- 首次启动约需 2-5 分钟（依赖安装 + PaddleOCR 模型加载 + Neo4j 启动）
+- PaddleOCR 模型首次下载约 500 MB，会自动缓存到 `~/.paddlex/`
 
 ## D. 模型下载（国内镜像）
 
@@ -73,7 +81,7 @@ start.sh 会自动完成以下步骤：
 启动后，检查 daemon 是否运行：
 ```bash
 curl -s http://localhost:27890/health
-# 应返回: {"ok": true, ...}
+# 应返回: {"status": "ok"}
 ```
 
 或在 Claude Code 中调用 `graph_stats` MCP 工具测试连接。
