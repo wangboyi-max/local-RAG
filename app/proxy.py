@@ -7,7 +7,7 @@ from app.config import settings
 
 mcp = FastMCP(
     "Knowledge Hub",
-    instructions="统一知识检索服务——结合本地 Markdown 笔记和 RAG 知识库（PDF/文档），支持 OCR 处理扫描版 PDF/图片，结合 Neo4j 知识图谱和向量混合检索。",
+    instructions="本地 RAG 知识库服务——支持 OCR 处理扫描版 PDF/图片，结合 Neo4j 知识图谱和向量混合检索。笔记请直接通过文件系统 Read 工具管理。",
 )
 
 DAEMON_URL = f"http://localhost:{settings.daemon_port}"
@@ -28,8 +28,6 @@ def _call(endpoint: str, **kwargs) -> str:
     except httpx.TimeoutException:
         return "错误：请求超时，请稍后重试"
 
-
-# ── 文档工具 ──────────────────────────────────────────────
 
 @mcp.tool()
 def search_docs(query: str, top_k: int = 4) -> str:
@@ -60,52 +58,6 @@ def graph_stats() -> str:
     """返回知识图谱的统计信息（节点数、关系数）。"""
     return _call("/api/graph_stats")
 
-
-# ── 笔记工具 ──────────────────────────────────────────────
-
-@mcp.tool()
-def create_note(title: str, content: str, tags: str | None = None) -> str:
-    """创建 Markdown 笔记并异步同步到 RAG。tags 为逗号分隔的标签。返回 task_id，用 task_status 查询进度。"""
-    return _call("/api/create_note", title=title, content=content, tags=tags)
-
-
-@mcp.tool()
-def get_note(title: str) -> str:
-    """获取指定笔记的完整内容。title 为笔记文件名（标题）。"""
-    return _call("/api/get_note", title=title)
-
-
-@mcp.tool()
-def list_notes(tag: str | None = None) -> str:
-    """列出所有笔记，可选按标签过滤。"""
-    return _call("/api/list_notes", tag=tag)
-
-
-@mcp.tool()
-def update_note(title: str, content: str | None = None, tags: str | None = None, new_title: str | None = None) -> str:
-    """更新笔记。按标题定位，可更新内容、标签或重命名。内容变动会异步重建 RAG。"""
-    return _call("/api/update_note", title=title, content=content, tags=tags, new_title=new_title)
-
-
-@mcp.tool()
-def reindex_note(title: str) -> str:
-    """重新索引指定笔记到 RAG（手动触发）。按标题定位，适用于外部编辑 .md 文件后重建索引。"""
-    return _call("/api/reindex_note", title=title)
-
-
-@mcp.tool()
-def delete_note(title: str) -> str:
-    """删除笔记及其所有 RAG 索引数据。按标题定位。"""
-    return _call("/api/delete_note", title=title)
-
-
-@mcp.tool()
-def search_notes(query: str, top_k: int = 5) -> str:
-    """在笔记内容中搜索相关笔记（向量语义检索）。"""
-    return _call("/api/search_notes", query=query, top_k=top_k)
-
-
-# ── 任务状态工具 ──────────────────────────────────────────
 
 @mcp.tool()
 def task_status(task_id: str | None = None) -> str:
