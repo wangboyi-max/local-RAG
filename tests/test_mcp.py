@@ -29,7 +29,7 @@ def send_request(proc, request):
 
 def main():
     proc = subprocess.Popen(
-        [sys.executable, "-m", "app.main"],
+        [sys.executable, "-m", "app.proxy"],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.DEVNULL,
@@ -63,66 +63,17 @@ def main():
         "method": "tools/list",
         "params": {},
     })
-    print(f"   响应: {tools_resp}")
-
-    # 3. 测试 ingest_file
-    print("\n3. 调用 ingest_file 索引测试 PDF...")
-    ingest_resp = send_request(proc, {
-        "jsonrpc": "2.0",
-        "id": 3,
-        "method": "tools/call",
-        "params": {
-            "name": "ingest_file",
-            "arguments": {"file_path": "/tmp/test_scanned.pdf"},
-        },
-    })
-    print(f"   响应: {ingest_resp}")
-
-    # 4. 测试 list_docs
-    print("\n4. 调用 list_docs...")
-    list_resp = send_request(proc, {
-        "jsonrpc": "2.0",
-        "id": 4,
-        "method": "tools/call",
-        "params": {"name": "list_docs", "arguments": {}},
-    })
-    print(f"   响应: {list_resp}")
-
-    # 5. 测试 search_docs
-    print("\n5. 调用 search_docs...")
-    search_resp = send_request(proc, {
-        "jsonrpc": "2.0",
-        "id": 5,
-        "method": "tools/call",
-        "params": {
-            "name": "search_docs",
-            "arguments": {"query": "RAG 是什么", "top_k": 3},
-        },
-    })
-    print(f"   响应: {search_resp}")
-
-    # 6. 测试 graph_stats
-    print("\n6. 调用 graph_stats...")
-    stats_resp = send_request(proc, {
-        "jsonrpc": "2.0",
-        "id": 7,
-        "method": "tools/call",
-        "params": {"name": "graph_stats", "arguments": {}},
-    })
-    print(f"   响应: {stats_resp}")
-
-    # 7. 测试 delete_docs
-    print("\n7. 调用 delete_docs...")
-    delete_resp = send_request(proc, {
-        "jsonrpc": "2.0",
-        "id": 6,
-        "method": "tools/call",
-        "params": {
-            "name": "delete_docs",
-            "arguments": {"source": "test_scanned.pdf"},
-        },
-    })
-    print(f"   响应: {delete_resp}")
+    tool_names = [t["name"] for t in tools_resp.get("result", {}).get("tools", [])]
+    print(f"   工具列表: {tool_names}")
+    # 验证没有笔记相关工具
+    assert "create_note" not in tool_names, "不应包含 create_note"
+    assert "get_note" not in tool_names, "不应包含 get_note"
+    assert "list_notes" not in tool_names, "不应包含 list_notes"
+    # 验证核心工具存在
+    assert "ingest_file" in tool_names, "应包含 ingest_file"
+    assert "search_docs" in tool_names, "应包含 search_docs"
+    assert "task_status" in tool_names, "应包含 task_status"
+    print("  ✓ 工具列表正确（无笔记相关工具）")
 
     print("\n=== MCP Server 测试完成 ===")
     proc.kill()

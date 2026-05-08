@@ -7,6 +7,7 @@ from socketserver import ThreadingMixIn
 
 from app.config import settings
 from app.services.task_tracker import TaskStatus
+from app.utils.text import clean_ocr_text, format_chunks, format_note, format_task
 
 logger = logging.getLogger(__name__)
 
@@ -240,7 +241,7 @@ class _RequestHandler(BaseHTTPRequestHandler):
         chunks = self.retrieval.search(query, top_k=top_k)
         if not chunks:
             return "未在知识库中找到相关内容。"
-        return _format_chunks(chunks)
+        return format_chunks(chunks)
 
     def _handle_list_docs(self) -> str:
         sources = self.retrieval.vector_store.get_unique_sources()
@@ -268,7 +269,7 @@ class _RequestHandler(BaseHTTPRequestHandler):
         note = self.note_store.get_note(title)
         if not note:
             return f"未找到笔记：{title}"
-        return _format_note(note)
+        return format_note(note)
 
     def _handle_list_notes(self, tag: str | None = None) -> str:
         notes = self.note_store.list_notes(tag=tag)
@@ -303,7 +304,7 @@ class _RequestHandler(BaseHTTPRequestHandler):
             task = self.task_tracker.get_task(task_id)
             if not task:
                 return f"未找到任务：{task_id}"
-            return _format_task(task)
+            return format_task(task)
         tasks = self.task_tracker.list_tasks()
         if not tasks:
             return "没有任务记录。"
@@ -330,59 +331,3 @@ class _RequestHandler(BaseHTTPRequestHandler):
 
     def _shutdown_daemon(self):
         self._shutdown_signal()
-
-
-def _format_chunks(chunks: list[dict]) -> str:
-    """格式化检索结果为可读文本。"""
-    import re
-    source_types = {"vector": "向量", "bm25": "关键词", "graph": "图谱"}
-    type_counts = {}
-    for c in chunks:
-        st = c.get("source_type", "vector")
-        type_counts[st] = type_counts.get(st, 0) + 1
-    summary_parts = [f"{source_types.get(st, st)} {n} 条" for st, n in type_counts.items()]
-    lines = [f"找到 {len(chunks)} 个相关结果（{', '.join(summary_parts)}）：\n"]
-    for i, c in enumerate(chunks, 1):
-        st = c.get("source_type", "vector")
-        tag = f"[{source_types.get(st, st)}]"
-        score_str = f"[相关度: {c['score']}]" if c.get("score") is not None else ""
-        text = _clean_ocr_text(c["text"])
-        lines.append(f"--- [{i}] {tag} {c['source']} (第{c['page']}页){score_str}\n{text}\n")
-    return "\n".join(lines)
-
-
-def _clean_ocr_text(text: str) -> str:
-    import re
-    lines = text.splitlines()
-    cleaned = [line.strip() for line in lines]
-    return re.sub(r"\n{3,}", "\n\n", "\n".join(cleaned)).strip()
-
-
-def _format_note(note: dict) -> str:
-    tag_str = f"\n标签: {', '.join(note['tags'])}" if note.get("tags") else ""
-    return (
-        f"📝 **{note['title']}**\n"
-        f"创建: {note['created_at'][:19]}\n"
-        f"更新: {note['updated_at'][:19]}"
-        f"{tag_str}\n"
-        f"\n---\n{note['content']}"
-    )
-
-
-def _format_task(task: dict) -> str:
-    from datetime import datetime, timezone
-    status_map = {"pending": "⏳ 等待中", "running": "🔄 执行中", "completed": "✅ 已完成", "failed": "❌ 失败"}
-    icon = status_map.get(task["status"], task["status"])
-    lines = [f"任务 ID: `{task['task_id']}`"]
-    lines.append(f"类型: {task['type']} — {icon}")
-    lines.append(f"标题: {task['title']}")
-    if task.get("progress"):
-        lines.append(f"进度: {task['progress']}")
-    if task.get("result"):
-        lines.append(f"结果: {task['result']}")
-    if task.get("error"):
-        lines.append(f"错误: {task['error']}")
-    lines.append(f"创建: {task['created_at'][:19]}")
-    lines.append(f"更新: {task['updated_at'][:19]}")
-    lines.append(f"查询: {datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S')}")
-    return "\n".join(lines)

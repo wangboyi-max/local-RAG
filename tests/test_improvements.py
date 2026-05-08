@@ -9,7 +9,7 @@ from app.config import settings
 from app.services.chunking import get_paragraph_aware_text_splitter
 from app.services.vector_store import VectorStoreService
 from app.pipelines.retrieval import RetrievalPipeline, _chunk_key
-from app.server import _format_chunks, _clean_ocr_text
+from app.utils.text import clean_ocr_text, format_chunks
 
 
 def test_config():
@@ -118,7 +118,7 @@ def test_bm25_and_vector_dedup():
 def test_clean_ocr_text():
     print("\n=== 6. OCR 文本清理 ===")
     dirty_text = "第一行内容\n\n\n\n第二行\n   有空格   \n\n\n\n第三行  "
-    cleaned = _clean_ocr_text(dirty_text)
+    cleaned = clean_ocr_text(dirty_text)
     assert "\n\n\n" not in cleaned, "不应有连续空行"
     assert cleaned == "第一行内容\n\n第二行\n有空格\n\n第三行", f"清理结果不对: {repr(cleaned)}"
     print(f"  输入: {repr(dirty_text)}")
@@ -133,7 +133,7 @@ def test_format_chunks():
         {"text": "这是 BM25 关键词检索结果", "source": "test.pdf", "page": 2, "score": None, "source_type": "bm25"},
         {"text": "这是图谱扩展的结果", "source": "test.pdf", "page": 3, "score": None, "source_type": "graph"},
     ]
-    formatted = _format_chunks(test_chunks)
+    formatted = format_chunks(test_chunks)
     assert "向量 1 条" in formatted, "应包含向量标签"
     assert "关键词 1 条" in formatted, "应包含关键词标签"
     assert "图谱 1 条" in formatted, "应包含图谱标签"
