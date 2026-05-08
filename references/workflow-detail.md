@@ -21,27 +21,27 @@ knowledge-hub 使用三层检索策略：
 
 **混合排序**：BM25 + 向量 + 图谱三路结果通过 Reciprocal Rank Fusion 合并排序，返回最相关的 top_k 个结果。
 
-## 笔记与 RAG 的同步机制
+## 笔记与 RAG 的关系
 
-Markdown 笔记管理采用**双写模式**：
+知识管理遵循 **LLM Wiki 渐进式方法论**（基于 Karpathy 的 LLM Wiki 理念）：
 
-1. **文件系统**：笔记以纯 `.md` 文件存储在 `.knowledge-hub/notes/` 目录，可用任意编辑器直接修改
-2. **RAG 索引**：通过 `create_note` / `reindex_note` MCP 工具将笔记内容同步到向量数据库和知识图谱
+- **Raw 原始层**：PDF/图片等长文档 → 通过 `ingest_file` 索引到 RAG（向量数据库 + 知识图谱）→ LLM 只读不改
+- **Wiki 编译层**：`.knowledge-hub/notes/` 下的 Markdown 笔记 → LLM 主动阅读、编译、组织、链接
+- **Schema 指令层**：SKILL.md 定义的结构和规则
 
-**同步触发时机**：
-- 创建笔记时：`create_note(title, content, tags)` 自动写入文件 + 异步索引
-- 外部编辑后：手动调用 `reindex_note(title)` 重建索引
-- 删除笔记时：`delete_note(title)` 同时删除文件和 RAG 索引
+**两者分工**：
+- RAG 处理"大量原始资料"的检索（PDF、扫描文档、图片）
+- Wiki 笔记处理"消化后的知识"（摘要、概念、经验总结）
 
-**异步处理**：索引是异步操作（大文件需要 OCR + 嵌入 + 图谱提取），可通过 `task_status(task_id)` 查询进度。
+**查询策略**：
+1. 先查 Wiki 笔记：是否已有消化过的结论？
+2. 再查 RAG：是否有相关的原始资料？
+3. 合并输出，如有新结论 → 归档回 notes/ 成为永久资产
 
 ## 异步任务处理
 
 以下操作返回 `task_id` 而非直接结果：
 - `ingest_file`：索引 PDF/图片（最慢，涉及 OCR）
-- `create_note`：创建并索引笔记
-- `update_note`：更新并重新索引笔记
-- `reindex_note`：手动重建索引
 
 查询进度：
 ```
@@ -60,7 +60,9 @@ task_status(task_id="xxx")
 
 ## 最佳实践
 
-1. **先笔记后 RAG**：具体操作类问题先查笔记，理论类问题查 RAG
+1. **先 Wiki 后 RAG**：具体操作类问题先查笔记，理论类问题查 RAG
 2. **大文件提前索引**：PDF 索引耗时较长（OCR 处理），建议在需要之前就预先索引
-3. **定期维护**：用 `list_docs` 和 `list_notes` 定期检查知识源，用 `delete_docs` / `delete_note` 清理过期内容
-4. **标签管理**：创建笔记时加 tags，方便后续 `list_notes(tag="xxx")` 快速筛选
+3. **定期维护**：用 `list_docs` 定期检查知识源，用 `delete_docs` 清理过期内容
+4. **查询即生产**：每次问答产生的有价值结论应写入 notes/，让知识复利增长
+5. **渐进式组织**：起步时笔记放根目录，数量增长后按主题自然分化子目录
+6. **Lint 自检**：定期扫描笔记，发现矛盾标注、知识缺口建议、过时内容标记
