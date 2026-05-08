@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # 启动 knowledge-hub MCP Server（Daemon + Proxy 架构）
 # 首次启动自动完成所有初始化：venv、依赖、.env、Neo4j、数据目录、daemon
+# 所有运行时数据（.venv、ChromaDB、uploads、notes、logs）统一存在 .knowledge-hub/ 下
 
 set -e
 
@@ -8,46 +9,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(dirname "$SCRIPT_DIR")"
 cd "$PLUGIN_ROOT"
 
-# ── 日志重定向：stderr 输出会干扰 MCP stdio 协议，全部写入日志文件 ──
-LOG_DIR="${HOME}/.local/share/knowledge-hub/logs"
-mkdir -p "$LOG_DIR" 2>/dev/null || true
-LOG_FILE="$LOG_DIR/startup.log"
-exec 2>>"$LOG_FILE"
-
-# ── 1. 确保 Python 可用 ──────────────────────────────────
-if ! command -v python3 &>/dev/null; then
-    echo "[knowledge-hub] 错误：未找到 Python3" >&2
-    exit 1
-fi
-
-# ── 2. 确保 venv + 依赖 ─────────────────────────────────
-if [ ! -d ".venv" ]; then
-    echo "[knowledge-hub] 首次启动：创建虚拟环境..." >&2
-    if command -v uv &>/dev/null; then
-        uv venv 2>>"$LOG_FILE"
-    fi
-    PYTHON=".venv/bin/python"
-else
-    PYTHON=".venv/bin/python"
-fi
-
-# 检查关键依赖是否已安装（每次启动自动同步）
-if ! "$PYTHON" -c "import pydantic, httpx, mcp" 2>/dev/null; then
-    echo "[knowledge-hub] 安装/更新依赖..." >&2
-    if command -v uv &>/dev/null; then
-        uv pip install -e . >>"$LOG_FILE" 2>&1
-    else
-        "$PYTHON" -m pip install -e . >>"$LOG_FILE" 2>&1
-    fi
-fi
-
-# ── 3. 确保 .env ─────────────────────────────────────────
-if [ ! -f ".env" ] && [ -f ".env.example" ]; then
-    cp .env.example .env
-    echo "[knowledge-hub] 已从 .env.example 创建 .env，请编辑 .env 设置 LLM_API_KEY" >&2
-fi
-
-# ── 4. 设置工作路径 ───────────────────────────────────────
+# ── 确定知识库工作目录（与 config.py 逻辑一致）────────────
 if [ -z "$LOCAL_RAG_WORK_DIR" ]; then
     if [ -f ".env" ]; then
         _env_val=$(grep '^LOCAL_RAG_WORK_DIR=' ".env" 2>/dev/null | head -1 | cut -d= -f2-)
@@ -56,9 +18,56 @@ if [ -z "$LOCAL_RAG_WORK_DIR" ]; then
         fi
     fi
     if [ -z "$LOCAL_RAG_WORK_DIR" ]; then
-        export LOCAL_RAG_WORK_DIR="${HOME}/.local/share/knowledge-hub/rag"
+        export LOCAL_RAG_WORK_DIR="./.knowledge-hub"
     fi
 fi
+
+# 解析为绝对路径
+KB_DIR="$(cd "$(dirname "$LOCAL_RAG_WORK_DIR")" 2>/dev/null && pwd)/$(basename "$LOCAL_RAG_WORK_DIR")" 2>/dev/null || KB_DIR="$(pwd)/.knowledge-hub"
+mkdir -p "$KB_DIR"
+
+# ── 日志目录 ─────────────────────────────────────────────
+LOG_DIR="$KB_DIR/logs"
+mkdir -p "$LOG_DIR"
+LOG_FILE="$LOG_DIR/startup.log"
+
+# ── 1. 确保 Python 可用 ──────────────────────────────────
+if ! command -v python3 &>/dev/null; then
+    echo "[knowledge-hub] 错误：未找到 Python3" >> "$LOG_FILE"
+    exit 1
+fi
+
+# ── 2. 确保 venv + 依赖（放在 KB_DIR 下）─────────────────
+VENV_DIR="$KB_DIR/.venv"
+PYTHON="$VENV_DIR/bin/python"
+
+if [ ! -d "$VENV_DIR" ]; then
+    echo "[knowledge-hub] 首次启动：创建虚拟环境 ($KB_DIR/.venv)" >> "$LOG_FILE"
+    if command -v uv &>/dev/null; then
+        uv venv --python python3 "$VENV_DIR" >> "$LOG_FILE" 2>&1
+    else
+        python3 -m venv "$VENV_DIR" >> "$LOG_FILE" 2>&1
+    fi
+fi
+
+# 检查关键依赖是否已安装（每次启动自动同步）
+if ! "$PYTHON" -c "import pydantic, httpx, mcp" 2>/dev/null; then
+    echo "[knowledge-hub] 安装/更新依赖..." >> "$LOG_FILE"
+    if command -v uv &>/dev/null; then
+        uv pip install -e "$PLUGIN_ROOT" --python "$VENV_DIR/bin/python" >> "$LOG_FILE" 2>&1
+    else
+        "$PYTHON" -m pip install -e "$PLUGIN_ROOT" >> "$LOG_FILE" 2>&1
+    fi
+fi
+
+# ── 3. 确保 .env ─────────────────────────────────────────
+if [ ! -f ".env" ] && [ -f ".env.example" ]; then
+    cp .env.example .env
+    echo "[knowledge-hub] 已从 .env.example 创建 .env" >> "$LOG_FILE"
+fi
+
+# ── 4. 设置工作路径环境变量（供 config.py 读取）───────────
+export LOCAL_RAG_WORK_DIR="$KB_DIR"
 
 # ── 5. 确保 Neo4j 容器运行 ───────────────────────────────
 if command -v docker &>/dev/null; then
@@ -99,5 +108,6 @@ else
 fi
 
 # ── 7. 启动 stdio Proxy（替换当前 shell 进程）────────────
-# 注意：daemon 可能在旧 venv 中运行，但 proxy 通过 HTTP 通信，不影响
+# 静默 stderr，避免干扰 MCP stdio 协议
+exec 2>/dev/null
 exec "$PYTHON" -m app.proxy

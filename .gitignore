@@ -8,3 +8,8 @@ dist/
 build/
 .pytest_cache/
 .installed_version
+
+# Knowledge Hub 运行时数据（不跟踪）
+.knowledge-hub/.venv/
+.knowledge-hub/logs/
+.knowledge-hub/rag/
