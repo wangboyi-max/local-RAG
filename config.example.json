@@ -1,5 +1,5 @@
 {
-  "_comment": "Knowledge Hub 用户配置模板。复制为 config.json 后修改。RAG 服务内部配置请使用 src/local_rag/.env",
+  "_comment": "Knowledge Hub 用户配置模板。复制为 config.json 后修改。RAG 服务内部配置请使用 .env",
   "notes_dir": "~/.local/share/knowledge-hub/notes",
   "rag_work_dir": "~/.local/share/knowledge-hub/rag",
   "embedding_model": "BAAI/bge-m3",

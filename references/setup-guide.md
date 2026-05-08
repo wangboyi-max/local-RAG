@@ -11,14 +11,14 @@
 
 ### 快速检查
 ```bash
-bash src/local_rag/scripts/install.sh
+bash scripts/install.sh
 ```
 
 ## B. 环境变量配置
 
 复制模板并编辑：
 ```bash
-cp src/local_rag/.env.example src/local_rag/.env
+cp .env.example .env
 ```
 
 必须/建议修改的配置项：
@@ -38,7 +38,7 @@ cp src/local_rag/.env.example src/local_rag/.env
 ## C. 一键启动
 
 ```bash
-bash src/local_rag/scripts/start.sh
+bash scripts/start.sh
 ```
 
 start.sh 会自动完成以下步骤：

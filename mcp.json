@@ -2,8 +2,7 @@
   "mcpServers": {
     "knowledge-hub": {
       "command": "bash",
-      "args": ["src/local_rag/scripts/start.sh"],
-      "cwd": "~/.agents/skills/knowledge-hub"
+      "args": ["scripts/start.sh"]
     }
   }
 }
