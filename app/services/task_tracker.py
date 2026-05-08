@@ -118,3 +118,9 @@ class TaskTrackerService:
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(self.tasks, f, ensure_ascii=False, indent=2)
         tmp.replace(self.state_file)
+
+    def clear_all(self):
+        """清空所有任务记录。"""
+        with self.lock:
+            self.tasks.clear()
+            self._save()

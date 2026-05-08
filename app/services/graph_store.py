@@ -193,6 +193,18 @@ class GraphStoreService:
                 """
             )
 
+    def clear_all(self) -> int:
+        """清空整个知识图谱（所有 Chunk、Entity 节点及所有关系）。"""
+        with self.driver.session() as session:
+            result = session.run("""
+                MATCH (n)
+                OPTIONAL MATCH (n)-[r]-()
+                RETURN count(n) AS nodes, count(r) AS rels
+            """).single()
+            nodes = result["nodes"] if result else 0
+            session.run("MATCH (n) DETACH DELETE n")
+            return nodes
+
     def get_stats(self) -> dict:
         """返回图谱统计信息。"""
         with self.driver.session() as session:

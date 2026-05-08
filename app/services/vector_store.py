@@ -80,6 +80,15 @@ class VectorStoreService:
         self._invalidate_bm25_cache()
         return len(matching_ids)
 
+    def clear_all(self):
+        """清空整个向量数据库（删除并重建 collection）。"""
+        self.client.delete_collection(name=self.collection_name)
+        self.collection = self.client.get_or_create_collection(
+            name=self.collection_name,
+            metadata={"hnsw:space": "cosine"},
+        )
+        self._invalidate_bm25_cache()
+
     def count(self) -> int:
         return self.collection.count()
 

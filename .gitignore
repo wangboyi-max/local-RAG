@@ -14,3 +14,6 @@ build/
 .knowledge-hub/logs/
 .knowledge-hub/rag/
 .knowledge-hub/tasks.json
+.knowledge-hub/chroma_db/
+.knowledge-hub/uploads/
+.knowledge-hub/notes/*.md

@@ -102,6 +102,7 @@ class _RequestHandler(BaseHTTPRequestHandler):
 
         routes = {
             "/api/shutdown": self._handle_shutdown,
+            "/api/clear_all": lambda: self._handle_clear_all(**body),
             "/api/search_docs": lambda: self._handle_search_docs(**body),
             "/api/ingest_file": lambda: self._handle_ingest_file(**body),
             "/api/list_docs": self._handle_list_docs,
@@ -200,6 +201,38 @@ class _RequestHandler(BaseHTTPRequestHandler):
     def _handle_shutdown(self) -> str:
         threading.Thread(target=self._shutdown_daemon).start()
         return "daemon 正在关闭..."
+
+    def _handle_clear_all(self, confirm: bool = False) -> str:
+        """清空所有知识库数据：ChromaDB、Neo4j 图谱、上传文件、笔记、任务记录。"""
+        import os
+        import shutil
+        if not confirm:
+            return "危险操作：将清空所有知识库数据。请在请求体中设置 \"confirm\": true 确认执行。"
+
+        with _write_lock:
+            # 1. 清空 ChromaDB 向量库
+            self.vector_store.clear_all()
+            # 2. 清空 Neo4j 图谱
+            if self.graph_store:
+                self.graph_store.clear_all()
+            # 3. 删除上传文件副本
+            upload_dir = settings.upload_dir
+            if os.path.isdir(upload_dir):
+                for f in os.listdir(upload_dir):
+                    fp = os.path.join(upload_dir, f)
+                    if os.path.isfile(fp):
+                        os.remove(fp)
+            # 4. 删除笔记文件
+            notes_dir = settings.notes_dir
+            if os.path.isdir(notes_dir):
+                for f in os.listdir(notes_dir):
+                    fp = os.path.join(notes_dir, f)
+                    if os.path.isfile(fp):
+                        os.remove(fp)
+            # 5. 清空任务记录
+            self.task_tracker.clear_all()
+
+        return "知识库已清空。ChromaDB 向量库、Neo4j 图谱、上传文件、笔记、任务记录已全部移除。"
 
     # ── 读操作（无锁）─────────────────────────────────────
 

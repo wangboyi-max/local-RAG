@@ -15,9 +15,10 @@ def upgrade(data_dir: str = ""):
     target = Path(data_dir)
     target.mkdir(parents=True, exist_ok=True)
 
-    subdirs = ["chroma_db", "uploads", "notes"]
+    # 与 config.py 保持一致：rag/chroma_db、rag/uploads、notes
+    subdirs = ["rag/chroma_db", "rag/uploads", "notes"]
     for sub in subdirs:
-        (target / sub).mkdir(exist_ok=True)
+        (target / sub).mkdir(parents=True, exist_ok=True)
 
     # 如果旧 ./data 目录有数据，迁移到外部目录
     old_data = Path(__file__).parent.parent.parent / "data"
